@@ -17,6 +17,19 @@ authorization_url =
   })
 ```
 
+Agents can also build the same URL through a prism:
+
+```elixir
+Lux.Prisms.Twitter.Auth.BuildAuthorizationUrl.handler(
+  %{
+    client_id: System.fetch_env!("TWITTER_CLIENT_ID"),
+    redirect_uri: "https://example.com/callback",
+    state: "csrf-token"
+  },
+  %{}
+)
+```
+
 After the callback, exchange the authorization code:
 
 ```elixir
@@ -64,6 +77,11 @@ Lux.Prisms.Twitter.Tweets.QuoteTweet.handler(
 Lux.Lenses.Twitter.GetTweet.focus(%{
   tweet_id: "123",
   tweet_fields: ["created_at", "public_metrics"],
+  access_token: tokens["access_token"]
+})
+
+Lux.Lenses.Twitter.GetMe.focus(%{
+  user_fields: ["username", "verified"],
   access_token: tokens["access_token"]
 })
 
