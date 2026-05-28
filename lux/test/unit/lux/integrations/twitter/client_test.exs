@@ -146,7 +146,10 @@ defmodule Lux.Integrations.Twitter.ClientTest do
       end)
 
       assert {:ok, %{"data" => %{"deleted" => true}}} =
-               Client.delete_tweet("tweet-1", %{access_token: "access-1", plug: {Req.Test, __MODULE__}})
+               Client.delete_tweet("tweet-1", %{
+                 access_token: "access-1",
+                 plug: {Req.Test, __MODULE__}
+               })
 
       Req.Test.expect(__MODULE__, fn conn ->
         assert conn.method == "GET"
@@ -179,7 +182,10 @@ defmodule Lux.Integrations.Twitter.ClientTest do
       end)
 
       assert {:ok, %{"data" => %{"id" => "user-1"}}} =
-               Client.get_me(%{user_fields: ["username"]}, %{access_token: "access-1", plug: {Req.Test, __MODULE__}})
+               Client.get_me(%{user_fields: ["username"]}, %{
+                 access_token: "access-1",
+                 plug: {Req.Test, __MODULE__}
+               })
 
       Req.Test.expect(__MODULE__, fn conn ->
         assert conn.method == "POST"
@@ -194,7 +200,10 @@ defmodule Lux.Integrations.Twitter.ClientTest do
       end)
 
       assert {:ok, %{"data" => %{"following" => true}}} =
-               Client.follow_user("user-1", "user-2", %{access_token: "access-1", plug: {Req.Test, __MODULE__}})
+               Client.follow_user("user-1", "user-2", %{
+                 access_token: "access-1",
+                 plug: {Req.Test, __MODULE__}
+               })
     end
 
     test "searches recent tweets and exposes rate limit headers" do
@@ -214,12 +223,85 @@ defmodule Lux.Integrations.Twitter.ClientTest do
       assert {:ok,
               %{
                 body: %{"data" => []},
-                rate_limit: %{limit: "300", remaining: "299", reset: "1770000000"}
+                rate_limit: %{
+                  limit: 300,
+                  remaining: 299,
+                  reset: 1_770_000_000,
+                  reset_at: ~U[2026-02-24 11:20:00Z],
+                  rate_limited?: false
+                }
               }} =
                Client.search_recent("lux", %{max_results: 10}, %{
                  access_token: "access-1",
                  plug: {Req.Test, __MODULE__},
                  with_rate_limit: true
+               })
+    end
+
+    test "returns structured rate limit errors" do
+      Req.Test.expect(__MODULE__, fn conn ->
+        assert conn.method == "GET"
+        assert conn.request_path == "/2/tweets/search/recent"
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.put_resp_header("x-rate-limit-limit", "300")
+        |> Plug.Conn.put_resp_header("x-rate-limit-remaining", "0")
+        |> Plug.Conn.put_resp_header("x-rate-limit-reset", "1770000000")
+        |> Plug.Conn.put_resp_header("retry-after", "900")
+        |> Plug.Conn.send_resp(429, Jason.encode!(%{"title" => "Too Many Requests"}))
+      end)
+
+      assert {:error,
+              {:rate_limited,
+               %{
+                 body: %{"title" => "Too Many Requests"},
+                 rate_limit: %{
+                   limit: 300,
+                   remaining: 0,
+                   reset: 1_770_000_000,
+                   reset_at: ~U[2026-02-24 11:20:00Z],
+                   retry_after: 900,
+                   rate_limited?: true
+                 }
+               }}} =
+               Client.search_recent("lux", %{}, %{
+                 access_token: "access-1",
+                 plug: {Req.Test, __MODULE__}
+               })
+    end
+
+    test "reads followers and following for user profile management" do
+      Req.Test.expect(__MODULE__, fn conn ->
+        assert conn.method == "GET"
+        assert conn.request_path == "/2/users/user-1/followers"
+        assert conn.query_string == "max_results=10&user.fields=username"
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode!(%{"data" => [%{"id" => "follower-1"}]}))
+      end)
+
+      assert {:ok, %{"data" => [%{"id" => "follower-1"}]}} =
+               Client.get_followers(
+                 "user-1",
+                 %{max_results: 10, user_fields: ["username"]},
+                 %{access_token: "access-1", plug: {Req.Test, __MODULE__}}
+               )
+
+      Req.Test.expect(__MODULE__, fn conn ->
+        assert conn.method == "GET"
+        assert conn.request_path == "/2/users/user-1/following"
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode!(%{"data" => [%{"id" => "following-1"}]}))
+      end)
+
+      assert {:ok, %{"data" => [%{"id" => "following-1"}]}} =
+               Client.get_following("user-1", %{}, %{
+                 access_token: "access-1",
+                 plug: {Req.Test, __MODULE__}
                })
     end
 

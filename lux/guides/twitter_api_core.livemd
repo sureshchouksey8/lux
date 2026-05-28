@@ -85,6 +85,17 @@ Lux.Lenses.Twitter.GetMe.focus(%{
   access_token: tokens["access_token"]
 })
 
+Lux.Lenses.Twitter.GetFollowers.focus(%{
+  user_id: "123",
+  max_results: 25,
+  access_token: tokens["access_token"]
+})
+
+Lux.Lenses.Twitter.GetFollowing.focus(%{
+  user_id: "123",
+  access_token: tokens["access_token"]
+})
+
 Lux.Lenses.Twitter.SearchRecent.focus(%{
   query: "lux lang:en",
   max_results: 10,
@@ -95,7 +106,9 @@ Lux.Lenses.Twitter.SearchRecent.focus(%{
 ## Rate Limits
 
 Pass `with_rate_limit: true` to receive the parsed X rate-limit response
-headers next to the body:
+headers next to the body. A `429` response returns `{:error, {:rate_limited,
+details}}` with the same parsed limit, reset, and retry-after metadata so agents
+can pause or reschedule instead of losing the failure context.
 
 ```elixir
 Lux.Integrations.Twitter.Client.search_recent(

@@ -2,6 +2,8 @@ defmodule Lux.Lenses.TwitterTest do
   use UnitAPICase, async: true
 
   alias Lux.Lenses.Twitter.GetTweet
+  alias Lux.Lenses.Twitter.GetFollowers
+  alias Lux.Lenses.Twitter.GetFollowing
   alias Lux.Lenses.Twitter.GetMe
   alias Lux.Lenses.Twitter.GetUser
   alias Lux.Lenses.Twitter.SearchRecent
@@ -84,6 +86,42 @@ defmodule Lux.Lenses.TwitterTest do
              SearchRecent.focus(%{
                query: "lux",
                max_results: 10,
+               access_token: "access-1",
+               plug: {Req.Test, __MODULE__}
+             })
+  end
+
+  test "followers and following lenses expose user social graph reads" do
+    Req.Test.expect(__MODULE__, fn conn ->
+      assert conn.method == "GET"
+      assert conn.request_path == "/2/users/user-1/followers"
+      assert conn.query_string == "max_results=5"
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(200, Jason.encode!(%{"data" => [%{"id" => "follower-1"}]}))
+    end)
+
+    assert {:ok, %{"data" => [%{"id" => "follower-1"}]}} =
+             GetFollowers.focus(%{
+               user_id: "user-1",
+               max_results: 5,
+               access_token: "access-1",
+               plug: {Req.Test, __MODULE__}
+             })
+
+    Req.Test.expect(__MODULE__, fn conn ->
+      assert conn.method == "GET"
+      assert conn.request_path == "/2/users/user-1/following"
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(200, Jason.encode!(%{"data" => [%{"id" => "following-1"}]}))
+    end)
+
+    assert {:ok, %{"data" => [%{"id" => "following-1"}]}} =
+             GetFollowing.focus(%{
+               user_id: "user-1",
                access_token: "access-1",
                plug: {Req.Test, __MODULE__}
              })

@@ -4,8 +4,8 @@ defmodule Lux.Integrations.Twitter.Client do
 
   The client covers the core issue surface: OAuth 2.0 PKCE, token refresh,
   tweet create/read/delete/edit/quote/thread operations, chunked media upload,
-  user lookup/follow management, rate-limit metadata, and testable request
-  injection through `Req.Test`.
+  user lookup/social-graph/follow management, structured rate-limit handling,
+  and testable request injection through `Req.Test`.
   """
 
   alias Lux.Integrations.Twitter
@@ -176,6 +176,16 @@ defmodule Lux.Integrations.Twitter.Client do
     request(:get, query_path("/2/users/by/username/#{username}", params), opts)
   end
 
+  @spec get_followers(String.t(), opts(), opts()) :: result()
+  def get_followers(user_id, params \\ %{}, opts \\ %{}) do
+    request(:get, query_path("/2/users/#{user_id}/followers", params), opts)
+  end
+
+  @spec get_following(String.t(), opts(), opts()) :: result()
+  def get_following(user_id, params \\ %{}, opts \\ %{}) do
+    request(:get, query_path("/2/users/#{user_id}/following", params), opts)
+  end
+
   @spec follow_user(String.t(), String.t(), opts()) :: result()
   def follow_user(source_user_id, target_user_id, opts \\ %{}) do
     request(
@@ -331,6 +341,10 @@ defmodule Lux.Integrations.Twitter.Client do
 
   defp handle_response({:ok, %{status: 401}}, _opts), do: {:error, :invalid_token}
 
+  defp handle_response({:ok, %{status: 429, body: body} = response}, _opts) do
+    {:error, {:rate_limited, %{body: body, rate_limit: rate_limit(response.headers)}}}
+  end
+
   defp handle_response(
          {:ok, %{status: status, body: %{"title" => title, "detail" => detail}}},
          _opts
@@ -347,16 +361,49 @@ defmodule Lux.Integrations.Twitter.Client do
   defp handle_response({:error, error}, _opts), do: {:error, error}
 
   defp rate_limit(headers) do
+    reset = header(headers, "x-rate-limit-reset")
+    remaining = parse_int(header(headers, "x-rate-limit-remaining"))
+
     %{
-      limit: header(headers, "x-rate-limit-limit"),
-      remaining: header(headers, "x-rate-limit-remaining"),
-      reset: header(headers, "x-rate-limit-reset")
+      limit: parse_int(header(headers, "x-rate-limit-limit")),
+      remaining: remaining,
+      reset: parse_int(reset),
+      reset_at: unix_datetime(reset),
+      retry_after: parse_int(header(headers, "retry-after")),
+      rate_limited?: remaining == 0
     }
+    |> drop_nil()
   end
 
   defp header(headers, name) do
     headers
     |> Enum.find_value(fn {key, value} -> if String.downcase(key) == name, do: value end)
+    |> first_header_value()
+  end
+
+  defp first_header_value([value | _]), do: value
+  defp first_header_value(value), do: value
+
+  defp parse_int(nil), do: nil
+
+  defp parse_int(value) when is_integer(value), do: value
+
+  defp parse_int(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {integer, ""} -> integer
+      _other -> nil
+    end
+  end
+
+  defp unix_datetime(nil), do: nil
+
+  defp unix_datetime(value) do
+    value
+    |> parse_int()
+    |> case do
+      nil -> nil
+      timestamp -> DateTime.from_unix!(timestamp)
+    end
   end
 
   defp maybe_put(options, _key, nil), do: options
