@@ -47,6 +47,10 @@ defmodule Lux.Integrations.Twitter.ClientTest do
                  "Basic Y2xpZW50LTE6c2VjcmV0LTE="
                ]
 
+        assert Plug.Conn.get_req_header(conn, "content-type") == [
+                 "application/x-www-form-urlencoded"
+               ]
+
         {:ok, body, conn} = Plug.Conn.read_body(conn)
         form = URI.decode_query(body)
 

@@ -322,12 +322,15 @@ defmodule Lux.Integrations.Twitter.Client do
 
   defp headers(opts) do
     token = opts[:access_token] || opts[:bearer_token] || Twitter.bearer_token()
-    base = [{"Content-Type", "application/json"} | List.wrap(opts[:headers])]
+    base = default_content_type(opts) ++ List.wrap(opts[:headers])
 
     if opts[:auth] == false or is_nil(token),
       do: base,
       else: [{"Authorization", "Bearer #{token}"} | base]
   end
+
+  defp default_content_type(%{json: _json}), do: [{"Content-Type", "application/json"}]
+  defp default_content_type(_opts), do: []
 
   defp handle_response({:ok, %{status: status, body: body} = response}, opts)
        when status in 200..299 do
