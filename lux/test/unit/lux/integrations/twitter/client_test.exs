@@ -35,6 +35,7 @@ defmodule Lux.Integrations.Twitter.ClientTest do
       assert query["redirect_uri"] == "https://example.com/callback"
       assert query["response_type"] == "code"
       assert query["scope"] =~ "tweet.write"
+      assert query["scope"] =~ "media.write"
       assert query["code_challenge_method"] == "S256"
     end
 
@@ -77,6 +78,14 @@ defmodule Lux.Integrations.Twitter.ClientTest do
   end
 
   describe "tweets" do
+    test "rejects write operations without a user access token" do
+      assert {:error, :access_token_required} =
+               Client.create_tweet(%{text: "hello"}, %{bearer_token: "app-only"})
+
+      assert {:error, :access_token_required} =
+               Client.delete_tweet("tweet-1", %{bearer_token: "app-only"})
+    end
+
     test "creates a post with reply, quote, media, and edit options" do
       Req.Test.expect(__MODULE__, fn conn ->
         assert conn.method == "POST"
@@ -331,6 +340,17 @@ defmodule Lux.Integrations.Twitter.ClientTest do
                  %{total_bytes: 1024, media_type: "video/mp4", media_category: "tweet_video"},
                  %{access_token: "access-1", plug: {Req.Test, __MODULE__}}
                )
+    end
+
+    test "rejects media and follow mutations without a user access token" do
+      assert {:error, :access_token_required} =
+               Client.media_upload(:init, %{total_bytes: 1024}, %{bearer_token: "app-only"})
+
+      assert {:error, :access_token_required} =
+               Client.follow_user("user-1", "user-2", %{bearer_token: "app-only"})
+
+      assert {:error, :access_token_required} =
+               Client.unfollow_user("user-1", "user-2", %{bearer_token: "app-only"})
     end
   end
 end

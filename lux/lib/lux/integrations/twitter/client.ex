@@ -106,7 +106,9 @@ defmodule Lux.Integrations.Twitter.Client do
 
   @spec create_tweet(opts(), opts()) :: result()
   def create_tweet(params, opts \\ %{}) do
-    request(:post, "/2/tweets", put_payload(opts, tweet_payload(params)))
+    with :ok <- require_access_token(opts) do
+      request(:post, "/2/tweets", put_payload(opts, tweet_payload(params)))
+    end
   end
 
   @spec edit_tweet(String.t(), opts(), opts()) :: result()
@@ -118,7 +120,11 @@ defmodule Lux.Integrations.Twitter.Client do
   end
 
   @spec delete_tweet(String.t(), opts()) :: result()
-  def delete_tweet(tweet_id, opts \\ %{}), do: request(:delete, "/2/tweets/#{tweet_id}", opts)
+  def delete_tweet(tweet_id, opts \\ %{}) do
+    with :ok <- require_access_token(opts) do
+      request(:delete, "/2/tweets/#{tweet_id}", opts)
+    end
+  end
 
   @spec get_tweet(String.t(), opts(), opts()) :: result()
   def get_tweet(tweet_id, params \\ %{}, opts \\ %{}) do
@@ -188,55 +194,76 @@ defmodule Lux.Integrations.Twitter.Client do
 
   @spec follow_user(String.t(), String.t(), opts()) :: result()
   def follow_user(source_user_id, target_user_id, opts \\ %{}) do
-    request(
-      :post,
-      "/2/users/#{source_user_id}/following",
-      put_payload(opts, %{target_user_id: target_user_id})
-    )
+    with :ok <- require_access_token(opts) do
+      request(
+        :post,
+        "/2/users/#{source_user_id}/following",
+        put_payload(opts, %{target_user_id: target_user_id})
+      )
+    end
   end
 
   @spec unfollow_user(String.t(), String.t(), opts()) :: result()
   def unfollow_user(source_user_id, target_user_id, opts \\ %{}) do
-    request(:delete, "/2/users/#{source_user_id}/following/#{target_user_id}", opts)
+    with :ok <- require_access_token(opts) do
+      request(:delete, "/2/users/#{source_user_id}/following/#{target_user_id}", opts)
+    end
   end
 
   @spec media_upload(:init | :append | :finalize | :status, opts(), opts()) :: result()
   def media_upload(action, params, opts \\ %{})
 
   def media_upload(:init, params, opts) do
-    fields =
-      multipart_fields(%{
-        command: "INIT",
-        total_bytes: value(params, :total_bytes),
-        media_type: value(params, :media_type),
-        media_category: value(params, :media_category)
-      })
+    with :ok <- require_access_token(opts) do
+      fields =
+        multipart_fields(%{
+          command: "INIT",
+          total_bytes: value(params, :total_bytes),
+          media_type: value(params, :media_type),
+          media_category: value(params, :media_category)
+        })
 
-    request(:post, @media_path, put_multipart(opts, fields))
+      request(:post, @media_path, put_multipart(opts, fields))
+    end
   end
 
   def media_upload(:append, params, opts) do
-    fields =
-      multipart_fields(%{
-        command: "APPEND",
-        media_id: value(params, :media_id),
-        segment_index: value(params, :segment_index, 0)
-      }) ++ [{:media, value(params, :media), filename: value(params, :filename, "media.bin")}]
+    with :ok <- require_access_token(opts) do
+      fields =
+        multipart_fields(%{
+          command: "APPEND",
+          media_id: value(params, :media_id),
+          segment_index: value(params, :segment_index, 0)
+        }) ++ [{:media, value(params, :media), filename: value(params, :filename, "media.bin")}]
 
-    request(:post, @media_path, put_multipart(opts, fields))
+      request(:post, @media_path, put_multipart(opts, fields))
+    end
   end
 
   def media_upload(:finalize, params, opts) do
-    fields = multipart_fields(%{command: "FINALIZE", media_id: value(params, :media_id)})
-    request(:post, @media_path, put_multipart(opts, fields))
+    with :ok <- require_access_token(opts) do
+      fields = multipart_fields(%{command: "FINALIZE", media_id: value(params, :media_id)})
+      request(:post, @media_path, put_multipart(opts, fields))
+    end
   end
 
   def media_upload(:status, params, opts) do
-    request(
-      :get,
-      query_path(@media_path, %{command: "STATUS", media_id: value(params, :media_id)}),
-      opts
-    )
+    with :ok <- require_access_token(opts) do
+      request(
+        :get,
+        query_path(@media_path, %{command: "STATUS", media_id: value(params, :media_id)}),
+        opts
+      )
+    end
+  end
+
+  defp require_access_token(opts) do
+    opts = normalize(opts)
+
+    case opts[:access_token] do
+      token when is_binary(token) and token != "" -> :ok
+      _missing -> {:error, :access_token_required}
+    end
   end
 
   defp token_opts(opts, form) do

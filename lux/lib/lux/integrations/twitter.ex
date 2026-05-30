@@ -12,6 +12,7 @@ defmodule Lux.Integrations.Twitter do
     "tweet.read",
     "tweet.write",
     "tweet.moderate.write",
+    "media.write",
     "users.read",
     "follows.read",
     "follows.write",
