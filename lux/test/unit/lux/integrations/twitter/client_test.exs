@@ -75,6 +75,14 @@ defmodule Lux.Integrations.Twitter.ClientTest do
                  plug: {Req.Test, __MODULE__}
                })
     end
+
+    test "preflights grant-specific token request fields" do
+      assert {:error, {:missing_required_fields, [:code, :redirect_uri, :code_verifier]}} =
+               Client.token_request(:authorization_code, %{client_id: "client-1"})
+
+      assert {:error, {:missing_required_fields, [:refresh_token]}} =
+               Client.token_request(:refresh_token, %{client_id: "client-1"})
+    end
   end
 
   describe "tweets" do
@@ -142,6 +150,34 @@ defmodule Lux.Integrations.Twitter.ClientTest do
       end)
 
       assert {:ok, [%{"data" => %{"id" => "tweet-1"}}, %{"data" => %{"id" => "tweet-2"}}]} =
+               Client.create_thread(["first", "second"], %{
+                 access_token: "access-1",
+                 plug: {Req.Test, __MODULE__}
+               })
+    end
+
+    test "thread errors include already published posts" do
+      Req.Test.expect(__MODULE__, 2, fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        json = Jason.decode!(body)
+
+        if json["text"] == "first" do
+          conn
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(201, Jason.encode!(%{"data" => %{"id" => "tweet-1"}}))
+        else
+          conn
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(403, Jason.encode!(%{"detail" => "missing scope"}))
+        end
+      end)
+
+      assert {:error,
+              {:partial_thread_failure,
+               %{
+                 reason: {403, "missing scope"},
+                 published: [%{"data" => %{"id" => "tweet-1"}}]
+               }}} =
                Client.create_thread(["first", "second"], %{
                  access_token: "access-1",
                  plug: {Req.Test, __MODULE__}
@@ -318,16 +354,17 @@ defmodule Lux.Integrations.Twitter.ClientTest do
                })
     end
 
-    test "initializes chunked media upload" do
+    test "initializes chunked media upload with the documented v2 endpoint" do
       Req.Test.expect(__MODULE__, fn conn ->
         assert conn.method == "POST"
-        assert conn.request_path == "/2/media/upload"
-        assert [content_type] = Plug.Conn.get_req_header(conn, "content-type")
-        assert content_type =~ "multipart/form-data"
+        assert conn.request_path == "/2/media/upload/initialize"
+        assert Plug.Conn.get_req_header(conn, "content-type") == ["application/json"]
 
         {:ok, body, conn} = Plug.Conn.read_body(conn)
-        assert body =~ "INIT"
-        assert body =~ "tweet_video"
+        json = Jason.decode!(body)
+        assert json["total_bytes"] == 1024
+        assert json["media_type"] == "video/mp4"
+        assert json["media_category"] == "tweet_video"
 
         conn
         |> Plug.Conn.put_resp_content_type("application/json")
@@ -340,6 +377,98 @@ defmodule Lux.Integrations.Twitter.ClientTest do
                  %{total_bytes: 1024, media_type: "video/mp4", media_category: "tweet_video"},
                  %{access_token: "access-1", plug: {Req.Test, __MODULE__}}
                )
+    end
+
+    test "appends and finalizes media uploads with documented media id paths" do
+      Req.Test.expect(__MODULE__, fn conn ->
+        assert conn.method == "POST"
+        assert conn.request_path == "/2/media/upload/media-1/append"
+        assert [content_type] = Plug.Conn.get_req_header(conn, "content-type")
+        assert content_type =~ "multipart/form-data"
+
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        assert body =~ "segment_index"
+        refute body =~ "media_id"
+        refute body =~ "APPEND"
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode!(%{"data" => %{"expires_at" => 1_770_000_000}}))
+      end)
+
+      assert {:ok, %{"data" => %{"expires_at" => 1_770_000_000}}} =
+               Client.media_upload(
+                 :append,
+                 %{media_id: "media-1", segment_index: 0, media: "bytes"},
+                 %{access_token: "access-1", plug: {Req.Test, __MODULE__}}
+               )
+
+      Req.Test.expect(__MODULE__, fn conn ->
+        assert conn.method == "POST"
+        assert conn.request_path == "/2/media/upload/media-1/finalize"
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode!(%{"data" => %{"id" => "media-1"}}))
+      end)
+
+      assert {:ok, %{"data" => %{"id" => "media-1"}}} =
+               Client.media_upload(:finalize, %{media_id: "media-1"}, %{
+                 access_token: "access-1",
+                 plug: {Req.Test, __MODULE__}
+               })
+    end
+
+    test "checks media upload status with the documented media_id query" do
+      Req.Test.expect(__MODULE__, fn conn ->
+        assert conn.method == "GET"
+        assert conn.request_path == "/2/media/upload"
+        assert conn.query_string == "media_id=media-1"
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode!(%{"data" => %{"id" => "media-1"}}))
+      end)
+
+      assert {:ok, %{"data" => %{"id" => "media-1"}}} =
+               Client.media_upload(:status, %{media_id: "media-1"}, %{
+                 access_token: "access-1",
+                 plug: {Req.Test, __MODULE__}
+               })
+    end
+
+    test "preflights media id requirements for chunked upload follow-ups" do
+      assert {:error, {:missing_required_fields, [:media_id]}} =
+               Client.media_upload(:finalize, %{}, %{access_token: "access-1"})
+
+      assert {:error, {:missing_required_fields, [:media_id, :media]}} =
+               Client.media_upload(:append, %{}, %{access_token: "access-1"})
+    end
+
+    test "preserves rate-limit context on permission errors when requested" do
+      Req.Test.expect(__MODULE__, fn conn ->
+        assert conn.method == "POST"
+        assert conn.request_path == "/2/tweets"
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.put_resp_header("x-rate-limit-limit", "50")
+        |> Plug.Conn.put_resp_header("x-rate-limit-remaining", "49")
+        |> Plug.Conn.put_resp_header("x-rate-limit-reset", "1770000000")
+        |> Plug.Conn.send_resp(403, Jason.encode!(%{"detail" => "missing required scope"}))
+      end)
+
+      assert {:error,
+              %{
+                status: 403,
+                reason: "missing required scope",
+                rate_limit: %{limit: 50, remaining: 49, reset: 1_770_000_000}
+              }} =
+               Client.create_tweet(%{text: "hello"}, %{
+                 access_token: "access-1",
+                 plug: {Req.Test, __MODULE__},
+                 with_rate_limit: true
+               })
     end
 
     test "rejects media and follow mutations without a user access token" do

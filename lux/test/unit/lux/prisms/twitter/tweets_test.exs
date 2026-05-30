@@ -103,6 +103,14 @@ defmodule Lux.Prisms.Twitter.TweetsTest do
              )
   end
 
+  test "token exchange prism rejects unsupported grant types without raising" do
+    assert {:error, {:unsupported_grant_type, "client_credentials"}} =
+             ExchangeToken.handler(
+               %{grant_type: "client_credentials", client_id: "client-1"},
+               %{}
+             )
+  end
+
   test "unfollow user prism calls the user-management endpoint" do
     Req.Test.expect(__MODULE__, fn conn ->
       assert conn.method == "DELETE"

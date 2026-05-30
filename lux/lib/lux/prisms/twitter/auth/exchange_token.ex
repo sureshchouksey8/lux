@@ -21,17 +21,18 @@ defmodule Lux.Prisms.Twitter.Auth.ExchangeToken do
   alias Lux.Integrations.Twitter.Client
 
   def handler(%{grant_type: grant_type} = input, _context) do
-    grant_type =
-      grant_type
-      |> normalize_grant_type()
-
-    Client.token_request(grant_type, Map.delete(input, :grant_type))
+    case normalize_grant_type(grant_type) do
+      {:ok, grant_type} -> Client.token_request(grant_type, Map.delete(input, :grant_type))
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   def handler(_input, _context), do: {:error, "Missing grant_type"}
 
-  defp normalize_grant_type(value) when is_atom(value), do: value
+  defp normalize_grant_type(value) when value in [:authorization_code, :refresh_token],
+    do: {:ok, value}
 
-  defp normalize_grant_type("authorization_code"), do: :authorization_code
-  defp normalize_grant_type("refresh_token"), do: :refresh_token
+  defp normalize_grant_type("authorization_code"), do: {:ok, :authorization_code}
+  defp normalize_grant_type("refresh_token"), do: {:ok, :refresh_token}
+  defp normalize_grant_type(value), do: {:error, {:unsupported_grant_type, value}}
 end

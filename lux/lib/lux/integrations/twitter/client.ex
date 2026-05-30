@@ -15,6 +15,7 @@ defmodule Lux.Integrations.Twitter.Client do
 
   @token_path "/2/oauth2/token"
   @media_path "/2/media/upload"
+  @media_initialize_path "/2/media/upload/initialize"
 
   @spec request(atom(), String.t(), opts()) :: result()
   def request(method, path, opts \\ %{}) do
@@ -75,33 +76,35 @@ defmodule Lux.Integrations.Twitter.Client do
   def token_request(:authorization_code, opts) do
     opts = normalize(opts)
 
-    form =
-      %{
-        grant_type: "authorization_code",
-        code: opts[:code],
-        redirect_uri: opts[:redirect_uri],
-        client_id: opts[:client_id],
-        code_verifier: opts[:code_verifier]
-      }
-      |> drop_nil()
-      |> Map.to_list()
+    with :ok <- require_fields(opts, [:client_id, :code, :redirect_uri, :code_verifier]) do
+      form =
+        %{
+          grant_type: "authorization_code",
+          code: opts[:code],
+          redirect_uri: opts[:redirect_uri],
+          client_id: opts[:client_id],
+          code_verifier: opts[:code_verifier]
+        }
+        |> Map.to_list()
 
-    request(:post, @token_path, token_opts(opts, form))
+      request(:post, @token_path, token_opts(opts, form))
+    end
   end
 
   def token_request(:refresh_token, opts) do
     opts = normalize(opts)
 
-    form =
-      %{
-        grant_type: "refresh_token",
-        refresh_token: opts[:refresh_token],
-        client_id: opts[:client_id]
-      }
-      |> drop_nil()
-      |> Map.to_list()
+    with :ok <- require_fields(opts, [:client_id, :refresh_token]) do
+      form =
+        %{
+          grant_type: "refresh_token",
+          refresh_token: opts[:refresh_token],
+          client_id: opts[:client_id]
+        }
+        |> Map.to_list()
 
-    request(:post, @token_path, token_opts(opts, form))
+      request(:post, @token_path, token_opts(opts, form))
+    end
   end
 
   @spec create_tweet(opts(), opts()) :: result()
@@ -147,10 +150,15 @@ defmodule Lux.Integrations.Twitter.Client do
           {:cont, {:ok, id, [response | responses]}}
 
         {:ok, response} ->
-          {:halt, {:error, {:missing_tweet_id, response}}}
+          {:halt,
+           {:error,
+            {:partial_thread_failure,
+             %{reason: {:missing_tweet_id, response}, published: Enum.reverse(responses)}}}}
 
         {:error, reason} ->
-          {:halt, {:error, reason}}
+          {:halt,
+           {:error,
+            {:partial_thread_failure, %{reason: reason, published: Enum.reverse(responses)}}}}
       end
     end)
     |> case do
@@ -215,47 +223,53 @@ defmodule Lux.Integrations.Twitter.Client do
 
   def media_upload(:init, params, opts) do
     with :ok <- require_access_token(opts) do
-      fields =
-        multipart_fields(%{
-          command: "INIT",
+      payload =
+        %{
           total_bytes: value(params, :total_bytes),
           media_type: value(params, :media_type),
-          media_category: value(params, :media_category)
-        })
+          media_category: value(params, :media_category),
+          additional_owners: value(params, :additional_owners),
+          shared: value(params, :shared)
+        }
+        |> drop_nil()
 
-      request(:post, @media_path, put_multipart(opts, fields))
+      request(:post, @media_initialize_path, put_payload(opts, payload))
     end
   end
 
   def media_upload(:append, params, opts) do
-    with :ok <- require_access_token(opts) do
+    with :ok <- require_access_token(opts),
+         :ok <- require_fields(params, [:media_id, :media]) do
+      media_id = value(params, :media_id)
+
       fields =
         multipart_fields(%{
-          command: "APPEND",
-          media_id: value(params, :media_id),
           segment_index: value(params, :segment_index, 0)
         }) ++ [{:media, value(params, :media), filename: value(params, :filename, "media.bin")}]
 
-      request(:post, @media_path, put_multipart(opts, fields))
+      request(:post, "#{@media_path}/#{media_id}/append", put_multipart(opts, fields))
     end
   end
 
   def media_upload(:finalize, params, opts) do
-    with :ok <- require_access_token(opts) do
-      fields = multipart_fields(%{command: "FINALIZE", media_id: value(params, :media_id)})
-      request(:post, @media_path, put_multipart(opts, fields))
+    with :ok <- require_access_token(opts),
+         :ok <- require_fields(params, [:media_id]) do
+      request(:post, "#{@media_path}/#{value(params, :media_id)}/finalize", opts)
     end
   end
 
   def media_upload(:status, params, opts) do
-    with :ok <- require_access_token(opts) do
+    with :ok <- require_access_token(opts),
+         :ok <- require_fields(params, [:media_id]) do
       request(
         :get,
-        query_path(@media_path, %{command: "STATUS", media_id: value(params, :media_id)}),
+        query_path(@media_path, %{media_id: value(params, :media_id)}),
         opts
       )
     end
   end
+
+  def media_upload(action, _params, _opts), do: {:error, {:unsupported_media_action, action}}
 
   defp require_access_token(opts) do
     opts = normalize(opts)
@@ -264,6 +278,19 @@ defmodule Lux.Integrations.Twitter.Client do
       token when is_binary(token) and token != "" -> :ok
       _missing -> {:error, :access_token_required}
     end
+  end
+
+  defp require_fields(opts, fields) do
+    missing =
+      Enum.filter(fields, fn field ->
+        case opts[field] do
+          value when is_binary(value) -> value == ""
+          nil -> true
+          _value -> false
+        end
+      end)
+
+    if missing == [], do: :ok, else: {:error, {:missing_required_fields, missing}}
   end
 
   defp token_opts(opts, form) do
@@ -376,19 +403,27 @@ defmodule Lux.Integrations.Twitter.Client do
   end
 
   defp handle_response(
-         {:ok, %{status: status, body: %{"title" => title, "detail" => detail}}},
-         _opts
+         {:ok, %{status: status, body: %{"title" => title, "detail" => detail}} = response},
+         opts
        ),
-       do: {:error, {status, "#{title}: #{detail}"}}
+       do: {:error, error_payload(status, "#{title}: #{detail}", response, opts)}
 
-  defp handle_response({:ok, %{status: status, body: %{"detail" => detail}}}, _opts),
-    do: {:error, {status, detail}}
+  defp handle_response({:ok, %{status: status, body: %{"detail" => detail}} = response}, opts),
+    do: {:error, error_payload(status, detail, response, opts)}
 
-  defp handle_response({:ok, %{status: status, body: %{"errors" => errors}}}, _opts),
-    do: {:error, {status, errors}}
+  defp handle_response({:ok, %{status: status, body: %{"errors" => errors}} = response}, opts),
+    do: {:error, error_payload(status, errors, response, opts)}
 
-  defp handle_response({:ok, %{status: status, body: body}}, _opts), do: {:error, {status, body}}
+  defp handle_response({:ok, %{status: status, body: body} = response}, opts),
+    do: {:error, error_payload(status, body, response, opts)}
+
   defp handle_response({:error, error}, _opts), do: {:error, error}
+
+  defp error_payload(status, reason, response, %{with_rate_limit: true}) do
+    %{status: status, reason: reason, rate_limit: rate_limit(response.headers)}
+  end
+
+  defp error_payload(status, reason, _response, _opts), do: {status, reason}
 
   defp rate_limit(headers) do
     reset = header(headers, "x-rate-limit-reset")
