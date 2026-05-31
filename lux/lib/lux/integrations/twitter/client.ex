@@ -245,7 +245,7 @@ defmodule Lux.Integrations.Twitter.Client do
       fields =
         multipart_fields(%{
           segment_index: value(params, :segment_index, 0)
-        }) ++ [{:media, value(params, :media), filename: value(params, :filename, "media.bin")}]
+        }) ++ [{:media, {value(params, :media), filename: value(params, :filename, "media.bin")}}]
 
       request(:post, "#{@media_path}/#{media_id}/append", put_multipart(opts, fields))
     end

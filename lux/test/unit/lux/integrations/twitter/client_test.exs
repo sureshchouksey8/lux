@@ -276,7 +276,7 @@ defmodule Lux.Integrations.Twitter.ClientTest do
                   limit: 300,
                   remaining: 299,
                   reset: 1_770_000_000,
-                  reset_at: ~U[2026-02-24 11:20:00Z],
+                  reset_at: ~U[2026-02-02 02:40:00Z],
                   rate_limited?: false
                 }
               }} =
@@ -309,7 +309,7 @@ defmodule Lux.Integrations.Twitter.ClientTest do
                    limit: 300,
                    remaining: 0,
                    reset: 1_770_000_000,
-                   reset_at: ~U[2026-02-24 11:20:00Z],
+                   reset_at: ~U[2026-02-02 02:40:00Z],
                    retry_after: 900,
                    rate_limited?: true
                  }
