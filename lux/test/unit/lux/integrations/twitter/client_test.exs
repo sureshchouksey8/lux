@@ -1,11 +1,43 @@
 defmodule Lux.Integrations.Twitter.ClientTest do
   use UnitAPICase, async: true
 
+  alias Lux.Integrations.Twitter
   alias Lux.Integrations.Twitter.Client
 
   setup do
     Req.Test.verify_on_exit!()
     :ok
+  end
+
+  describe "configuration" do
+    test "uses the configured API URL for request paths" do
+      previous = Application.get_env(:lux, Twitter)
+
+      try do
+        Application.put_env(:lux, Twitter, api_url: "https://api.twitter.com")
+
+        Req.Test.expect(__MODULE__, fn conn ->
+          assert conn.method == "GET"
+          assert conn.request_path == "/2/tweets/search/recent"
+
+          conn
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(200, Jason.encode!(%{"data" => []}))
+        end)
+
+        assert {:ok, %{"data" => []}} =
+                 Client.search_recent("lux", %{}, %{
+                   access_token: "access-1",
+                   plug: {Req.Test, __MODULE__}
+                 })
+      after
+        if previous do
+          Application.put_env(:lux, Twitter, previous)
+        else
+          Application.delete_env(:lux, Twitter)
+        end
+      end
+    end
   end
 
   describe "OAuth 2.0 PKCE" do

@@ -3,6 +3,27 @@
 This guide shows how Lux agents can use X/Twitter API v2 without putting live
 credentials in tests or examples.
 
+## Runtime Configuration
+
+The client defaults to the current X API host, `https://api.x.com`. If an app
+or account still needs the legacy Twitter host for v2 endpoints, set
+`TWITTER_API_URL=https://api.twitter.com` or configure the integration directly:
+
+```elixir
+config :lux, Lux.Integrations.Twitter,
+  api_url: "https://api.x.com",
+  authorize_url: "https://x.com/i/oauth2/authorize"
+```
+
+Minimal credential shapes by mode:
+
+- App-only reads: `TWITTER_BEARER_TOKEN`
+- OAuth 2.0 PKCE: `TWITTER_CLIENT_ID`, `TWITTER_REDIRECT_URI`, generated
+  verifier/challenge, short-lived `access_token`, and optionally
+  `TWITTER_CLIENT_SECRET` plus `refresh_token`
+- Write/media/follow operations: a user OAuth `access_token`; app-only bearer
+  tokens are intentionally rejected for mutation paths
+
 ## OAuth 2.0 PKCE
 
 ```elixir
@@ -117,6 +138,42 @@ Lux.Integrations.Twitter.Client.search_recent(
   %{access_token: tokens["access_token"], with_rate_limit: true}
 )
 ```
+
+## Media Upload
+
+Chunked media upload is exposed one step at a time so agents can persist the
+server response between calls:
+
+```elixir
+{:ok, init} =
+  Lux.Prisms.Twitter.Media.UploadMedia.handler(
+    %{
+      action: :init,
+      total_bytes: 1_024_000,
+      media_type: "video/mp4",
+      media_category: "tweet_video",
+      access_token: tokens["access_token"]
+    },
+    %{}
+  )
+
+media_id = get_in(init, ["data", "id"]) || init["media_id_string"] || init["media_id"]
+
+Lux.Prisms.Twitter.Media.UploadMedia.handler(
+  %{action: :append, media_id: media_id, segment_index: 0, media: chunk, access_token: tokens["access_token"]},
+  %{}
+)
+
+Lux.Prisms.Twitter.Media.UploadMedia.handler(
+  %{action: :finalize, media_id: media_id, access_token: tokens["access_token"]},
+  %{}
+)
+```
+
+For status polling, pass only the returned `media_id`. Response shapes can
+include either nested `data.id` values or legacy-style `media_id_string`
+depending on the endpoint/account behavior, so production agents should store
+the full response payload as well as the extracted media ID.
 
 ## Tests
 
