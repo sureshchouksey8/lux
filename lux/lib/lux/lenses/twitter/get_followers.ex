@@ -2,6 +2,7 @@ defmodule Lux.Lenses.Twitter.GetFollowers do
   @moduledoc "Reads followers for an X/Twitter user."
 
   alias Lux.Integrations.Twitter.Client
+  alias Lux.Lenses.Twitter.Input
 
   def view do
     Lux.Lens.new(
@@ -23,10 +24,17 @@ defmodule Lux.Lenses.Twitter.GetFollowers do
 
   def focus(input, opts \\ [])
 
-  def focus(%{user_id: user_id} = input, _opts) do
-    opts = Map.take(input, [:access_token, :bearer_token, :plug, :with_rate_limit])
-    params = Map.drop(input, [:user_id, :access_token, :bearer_token, :plug, :with_rate_limit])
-    Client.get_followers(user_id, params, opts)
+  def focus(input, _opts) when is_map(input) do
+    input = Input.normalize(input)
+    user_id = input[:user_id]
+
+    if is_nil(user_id) do
+      {:error, "Missing user_id"}
+    else
+      opts = Map.take(input, [:access_token, :bearer_token, :plug, :with_rate_limit])
+      params = Map.drop(input, [:user_id, :access_token, :bearer_token, :plug, :with_rate_limit])
+      Client.get_followers(user_id, params, opts)
+    end
   end
 
   def focus(_input, _opts), do: {:error, "Missing user_id"}

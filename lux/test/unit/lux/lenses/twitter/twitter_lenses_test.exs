@@ -91,6 +91,35 @@ defmodule Lux.Lenses.TwitterTest do
              })
   end
 
+  test "search recent lens accepts string-key schema input with token and rate limit metadata" do
+    Req.Test.expect(__MODULE__, fn conn ->
+      assert conn.method == "GET"
+      assert conn.request_path == "/2/tweets/search/recent"
+      assert conn.query_string == "max_results=10&query=lux"
+      assert Plug.Conn.get_req_header(conn, "authorization") == ["Bearer access-1"]
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.put_resp_header("x-rate-limit-limit", "300")
+      |> Plug.Conn.put_resp_header("x-rate-limit-remaining", "299")
+      |> Plug.Conn.put_resp_header("x-rate-limit-reset", "1770000000")
+      |> Plug.Conn.send_resp(200, Jason.encode!(%{"data" => []}))
+    end)
+
+    assert {:ok,
+            %{
+              body: %{"data" => []},
+              rate_limit: %{limit: 300, remaining: 299}
+            }} =
+             SearchRecent.focus(%{
+               "query" => "lux",
+               "max_results" => 10,
+               "access_token" => "access-1",
+               "with_rate_limit" => true,
+               "plug" => {Req.Test, __MODULE__}
+             })
+  end
+
   test "followers and following lenses expose user social graph reads" do
     Req.Test.expect(__MODULE__, fn conn ->
       assert conn.method == "GET"
