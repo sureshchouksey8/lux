@@ -1,21 +1,41 @@
 defmodule Lux.Web3.Wallet do
   @moduledoc """
-  Handles non-custodial wallet generation and address derivation.
+  Handles non-custodial wallet generation, address derivation, and multi-type
+  wallet record management. Supports local (generated/imported) wallets with
+  typed boundaries for HD, hardware, and multi-sig wallet expansion.
   """
+
+  alias Lux.Web3.WalletTypes
 
   @type private_key :: String.t()
   @type address :: String.t()
 
   @doc """
   Generates a new random private key and its derived Ethereum address.
+  Optionally accepts a wallet type (defaults to :local) and chain IDs.
   """
-  @spec generate_wallet() :: {:ok, %{private_key: private_key(), address: address()}} | {:error, any()}
-  def generate_wallet do
+  @spec generate_wallet(keyword()) :: {:ok, %{private_key: private_key(), address: address(), wallet_record: map()}} | {:error, any()}
+  def generate_wallet(opts \\ []) do
+    wallet_type = Keyword.get(opts, :type, :local)
+    chain_ids = Keyword.get(opts, :chain_ids, [1])
+    label = Keyword.get(opts, :label)
+
+    case WalletTypes.validate_type(wallet_type) do
+      :ok ->
+        do_generate_wallet(wallet_type, chain_ids, label)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp do_generate_wallet(:local, chain_ids, label) do
     private_key_bytes = :crypto.strong_rand_bytes(32)
     case derive_address(private_key_bytes) do
       {:ok, address} ->
         private_key_hex = "0x" <> Base.encode16(private_key_bytes, case: :lower)
-        {:ok, %{private_key: private_key_hex, address: address}}
+        wallet_record = WalletTypes.new(address, :local, chain_ids: chain_ids, label: label)
+        {:ok, %{private_key: private_key_hex, address: address, wallet_record: wallet_record}}
       {:error, reason} ->
         {:error, reason}
     end

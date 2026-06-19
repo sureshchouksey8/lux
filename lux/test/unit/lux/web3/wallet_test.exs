@@ -3,15 +3,37 @@ defmodule Lux.Web3.WalletTest do
 
   alias Lux.Web3.Wallet
 
-  describe "generate_wallet/0" do
+  describe "generate_wallet/1" do
     test "successfully generates a new private key and valid checksummed address" do
-      assert {:ok, %{private_key: private_key, address: address}} = Wallet.generate_wallet()
+      assert {:ok, %{private_key: private_key, address: address, wallet_record: record}} = Wallet.generate_wallet()
       assert String.starts_with?(private_key, "0x")
       assert String.length(private_key) == 66 # 0x + 64 hex characters
       assert Wallet.valid_address?(address)
+      assert record.type == :local
+      assert record.chain_ids == [1]
       
       # Ensure address is checksummed (has both upper and lowercase letters)
       refute address == String.downcase(address)
+    end
+
+    test "generates wallet with custom chain_ids and label" do
+      assert {:ok, %{wallet_record: record}} = Wallet.generate_wallet(
+        chain_ids: [1, 137, 42161],
+        label: "Test Wallet"
+      )
+      assert record.chain_ids == [1, 137, 42161]
+      assert record.label == "Test Wallet"
+    end
+
+    test "rejects unsupported wallet types with descriptive error" do
+      assert {:error, msg} = Wallet.generate_wallet(type: :hd)
+      assert msg =~ "HD wallet derivation"
+
+      assert {:error, msg} = Wallet.generate_wallet(type: :hardware)
+      assert msg =~ "Hardware wallet"
+
+      assert {:error, msg} = Wallet.generate_wallet(type: :multisig)
+      assert msg =~ "Multi-signature"
     end
   end
 

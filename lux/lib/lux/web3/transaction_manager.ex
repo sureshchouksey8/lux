@@ -62,10 +62,13 @@ defmodule Lux.Web3.TransactionManager do
       nonce: nil,
       queue: :queue.new(),
       active_tx: nil,
-      timer: nil
+      timer: nil,
+      nonce_initialized: false
     }
 
-    {:ok, state, {:continue, :init_nonce}}
+    # Lazy nonce init: nonce is fetched on first transaction, not on startup.
+    # This decouples wallet creation/import from requiring a live RPC connection.
+    {:ok, state}
   end
 
   @impl true
@@ -73,7 +76,7 @@ defmodule Lux.Web3.TransactionManager do
     case Ethers.get_transaction_count(state.address) do
       {:ok, nonce} ->
         Logger.debug("Initialized transaction count (nonce) for #{state.address} to #{nonce}")
-        {:noreply, %{state | nonce: nonce}, {:continue, :process_queue}}
+        {:noreply, %{state | nonce: nonce, nonce_initialized: true}, {:continue, :process_queue}}
 
       {:error, reason} ->
         Logger.error("Failed to fetch initial nonce for #{state.address}: #{inspect(reason)}. Retrying in 5s.")
@@ -125,7 +128,14 @@ defmodule Lux.Web3.TransactionManager do
   def handle_call({:send_transaction, tx_params}, from, state) do
     tx = %{id: make_ref(), params: tx_params, reply_to: from}
     new_queue = :queue.in(tx, state.queue)
-    {:noreply, %{state | queue: new_queue}, {:continue, :process_queue}}
+    new_state = %{state | queue: new_queue}
+
+    # Trigger nonce initialization on first transaction if not yet done
+    if state.nonce_initialized do
+      {:noreply, new_state, {:continue, :process_queue}}
+    else
+      {:noreply, new_state, {:continue, :init_nonce}}
+    end
   end
 
   @impl true
