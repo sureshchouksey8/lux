@@ -5,6 +5,8 @@ defmodule Lux.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      {Registry, keys: :unique, name: Lux.Web3.TransactionManagerRegistry},
+      {DynamicSupervisor, strategy: :one_for_one, name: Lux.Web3.TransactionManagerSupervisor},
       {Venomous.SnakeSupervisor, [strategy: :one_for_one, max_restarts: 0, max_children: 50]},
       {Venomous.PetSnakeSupervisor, [strategy: :one_for_one, max_children: 10]},
       {Task.Supervisor, name: Lux.ScheduledTasksSupervisor},
