@@ -34,9 +34,17 @@ defmodule Lux.Integrations.YouTube do
   """
   @spec add_auth_header(Lux.Lens.t()) :: Lux.Lens.t()
   def add_auth_header(%Lux.Lens{} = lens) do
-    api_key = Lux.Config.youtube_api_key()
-    separator = if String.contains?(lens.url, "?"), do: "&", else: "?"
-    %{lens | url: lens.url <> separator <> "key=#{api_key}"}
+    access_token = Map.get(lens.params, :access_token) || Map.get(lens.params, "access_token")
+
+    if access_token do
+      params = lens.params |> Map.delete(:access_token) |> Map.delete("access_token")
+      headers = [{"Authorization", "Bearer #{access_token}"} | lens.headers]
+      %{lens | params: params, headers: headers}
+    else
+      api_key = Lux.Config.youtube_api_key()
+      separator = if String.contains?(lens.url, "?"), do: "&", else: "?"
+      %{lens | url: lens.url <> separator <> "key=#{api_key}"}
+    end
   end
 
   @spec add_auth_header(Plug.Conn.t()) :: Plug.Conn.t()

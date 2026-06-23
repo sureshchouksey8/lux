@@ -80,10 +80,12 @@ defmodule Lux.Prisms.YouTube.CreatePlaylist do
   Returns {:error, {status, message}} on failure.
   """
   def handler(params, agent) do
+    params = Lux.Integrations.YouTube.Utils.normalize_to_atoms(params)
     with {:ok, title} <- validate_param(params, :title) do
       agent_name = agent[:name] || "Unknown Agent"
       description = Map.get(params, :description, "")
       privacy_status = Map.get(params, :privacy_status, "private")
+      dry_run = Map.get(params, :dry_run)
 
       Logger.info("Agent #{agent_name} creating YouTube playlist: #{title}")
 
@@ -91,6 +93,7 @@ defmodule Lux.Prisms.YouTube.CreatePlaylist do
         params: %{part: "snippet,status"},
         access_token: Map.get(params, :access_token),
         plug: Map.get(params, :plug),
+        dry_run: dry_run,
         json: %{
           snippet: %{
             title: title,

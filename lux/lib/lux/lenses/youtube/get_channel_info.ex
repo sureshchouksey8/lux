@@ -48,6 +48,15 @@ defmodule Lux.Lenses.YouTube.GetChannelInfo do
       required: ["id"]
     }
 
+  def before_focus(params) do
+    params
+    |> Map.delete(:access_token)
+    |> Map.delete("access_token")
+    |> Map.delete(:plug)
+    |> Map.delete("plug")
+    |> Lux.Integrations.YouTube.Utils.to_youtube_query_params()
+  end
+
   @doc """
   Transforms the YouTube API response into a simpler format.
   """

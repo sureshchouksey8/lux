@@ -124,6 +124,7 @@ defmodule Lux.Prisms.YouTube.StartLiveBroadcast do
   Returns {:error, {status, message}} on failure.
   """
   def handler(params, agent) do
+    params = Lux.Integrations.YouTube.Utils.normalize_to_atoms(params)
     with {:ok, title} <- validate_param(params, :title),
          {:ok, scheduled_start_time} <- validate_param(params, :scheduled_start_time) do
       agent_name = agent[:name] || "Unknown Agent"
@@ -131,11 +132,12 @@ defmodule Lux.Prisms.YouTube.StartLiveBroadcast do
       privacy_status = Map.get(params, :privacy_status, "private")
       access_token = Map.get(params, :access_token)
       plug = Map.get(params, :plug)
+      dry_run = Map.get(params, :dry_run)
 
       Logger.info("Agent #{agent_name} creating YouTube live broadcast: #{title}")
 
       # Step 1: Create the broadcast
-      case create_broadcast(title, description, scheduled_start_time, privacy_status, access_token, plug) do
+      case create_broadcast(title, description, scheduled_start_time, privacy_status, access_token, plug, dry_run) do
         {:ok, broadcast_result} ->
           # Step 2: Create a live stream and bind it (optional)
           stream_title = Map.get(params, :stream_title, "#{title} - Stream")
@@ -143,13 +145,14 @@ defmodule Lux.Prisms.YouTube.StartLiveBroadcast do
           frame_rate = Map.get(params, :frame_rate, "30fps")
           ingestion_type = Map.get(params, :ingestion_type, "rtmp")
 
-          case create_and_bind_stream(broadcast_result.broadcast_id, stream_title, resolution, frame_rate, ingestion_type, access_token, plug) do
+          case create_and_bind_stream(broadcast_result.broadcast_id, stream_title, resolution, frame_rate, ingestion_type, access_token, plug, dry_run) do
             {:ok, stream_result} ->
               {:ok, Map.merge(broadcast_result, stream_result)}
 
-            {:error, _} ->
-              # Return broadcast result even if stream binding fails
-              {:ok, broadcast_result}
+            {:error, error} ->
+              # Propagate the binding/stream creation error instead of ignoring it
+              Logger.error("Failed to create and bind stream: #{inspect(error)}")
+              {:error, error}
           end
 
         {:error, error} ->
@@ -158,11 +161,12 @@ defmodule Lux.Prisms.YouTube.StartLiveBroadcast do
     end
   end
 
-  defp create_broadcast(title, description, scheduled_start_time, privacy_status, access_token, plug) do
+  defp create_broadcast(title, description, scheduled_start_time, privacy_status, access_token, plug, dry_run) do
     case Client.request(:post, "/liveBroadcasts", %{
       params: %{part: "snippet,status,contentDetails"},
       access_token: access_token,
       plug: plug,
+      dry_run: dry_run,
       json: %{
         snippet: %{
           title: title,
@@ -198,12 +202,13 @@ defmodule Lux.Prisms.YouTube.StartLiveBroadcast do
     end
   end
 
-  defp create_and_bind_stream(broadcast_id, stream_title, resolution, frame_rate, ingestion_type, access_token, plug) do
+  defp create_and_bind_stream(broadcast_id, stream_title, resolution, frame_rate, ingestion_type, access_token, plug, dry_run) do
     # Create the live stream
     case Client.request(:post, "/liveStreams", %{
       params: %{part: "snippet,cdn,status"},
       access_token: access_token,
       plug: plug,
+      dry_run: dry_run,
       json: %{
         snippet: %{
           title: stream_title
@@ -217,21 +222,25 @@ defmodule Lux.Prisms.YouTube.StartLiveBroadcast do
     }) do
       {:ok, %{"id" => stream_id, "cdn" => %{"ingestionInfo" => ingestion_info}}} ->
         # Bind the stream to the broadcast
-        _bind_result = Client.request(:post, "/liveBroadcasts/bind", %{
+        case Client.request(:post, "/liveBroadcasts/bind", %{
           params: %{
             part: "id,contentDetails",
             id: broadcast_id,
             streamId: stream_id
           },
           access_token: access_token,
-          plug: plug
-        })
-
-        {:ok, %{
-          stream_id: stream_id,
-          ingestion_address: ingestion_info["ingestionAddress"],
-          stream_name: ingestion_info["streamName"]
-        }}
+          plug: plug,
+          dry_run: dry_run
+        }) do
+          {:ok, _bind_res} ->
+            {:ok, %{
+              stream_id: stream_id,
+              ingestion_address: ingestion_info["ingestionAddress"],
+              stream_name: ingestion_info["streamName"]
+            }}
+          {:error, error} ->
+            {:error, error}
+        end
 
       {:error, error} ->
         {:error, error}

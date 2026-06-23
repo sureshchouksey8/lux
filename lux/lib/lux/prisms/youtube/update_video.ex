@@ -87,12 +87,14 @@ defmodule Lux.Prisms.YouTube.UpdateVideo do
   Returns {:error, {status, message}} on failure.
   """
   def handler(params, agent) do
+    params = Lux.Integrations.YouTube.Utils.normalize_to_atoms(params)
     with {:ok, video_id} <- validate_param(params, :video_id),
          {:ok, title} <- validate_param(params, :title) do
       agent_name = agent[:name] || "Unknown Agent"
       description = Map.get(params, :description, "")
       tags = Map.get(params, :tags, [])
       category_id = Map.get(params, :category_id, "22")
+      dry_run = Map.get(params, :dry_run)
 
       Logger.info("Agent #{agent_name} updating YouTube video: #{video_id}")
 
@@ -117,6 +119,7 @@ defmodule Lux.Prisms.YouTube.UpdateVideo do
         params: %{part: "snippet,status"},
         access_token: Map.get(params, :access_token),
         plug: Map.get(params, :plug),
+        dry_run: dry_run,
         json: body
       }) do
         {:ok, %{"id" => vid_id, "snippet" => %{"title" => updated_title}}} ->
