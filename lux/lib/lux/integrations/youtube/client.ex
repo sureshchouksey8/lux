@@ -156,6 +156,10 @@ defmodule Lux.Integrations.YouTube.Client do
         text = get_in(opts, [:json, :snippet, :textMessageDetails, :messageText]) || "Mock Message"
         %{"id" => "mock_message_id", "snippet" => %{"textMessageDetails" => %{"messageText" => text}}}
 
+      String.contains?(path, "/comments") and not String.contains?(path, "setModerationStatus") ->
+        text = get_in(opts, [:json, :snippet, :textOriginal]) || "Mock Reply"
+        %{"id" => "mock_reply_id", "snippet" => %{"textOriginal" => text}}
+
       true ->
         %{"status" => "success", "mocked" => true}
     end
