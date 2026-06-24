@@ -35,6 +35,14 @@ defmodule Lux.Integrations.Twitter.Client do
   end
 
   @doc """
+  Edits a tweet. (Note: Only available to some verified accounts)
+  """
+  def edit_tweet(tweet_id, text, opts \\ %{}) do
+    payload = %{text: text}
+    request(:put, "/tweets/#{tweet_id}", Map.put(opts, :json, payload))
+  end
+
+  @doc """
   Replies to a tweet.
   """
   def reply_to_tweet(tweet_id, text, opts \\ %{}) do
