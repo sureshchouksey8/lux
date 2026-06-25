@@ -14,6 +14,24 @@ defmodule Lux.Integration.Company.YouTubePipelineTest do
     setup do
       # Set up deterministic Req stubs for the LLM API calls made by agents
       Req.Test.stub(OpenAI, fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        json = body |> Jason.decode!()
+        schema_name = get_in(json, ["response_format", "json_schema", "name"]) || "unknown"
+
+        content = 
+          case schema_name do
+            "script_generation" ->
+              ~s({"title_ideas":["Deterministic Idea"],"hook":"Deterministic Hook","outline":["Intro"],"full_script":"Deterministic Script","estimated_duration":5,"editing_suggestions":["Cut here"]})
+            "visual_optimization" ->
+              ~s({"thumbnail_prompts":["Prompt"],"broll_suggestions":["Broll"],"color_palette":["#FFFFFF"],"end_screen_layout":"Layout","card_placements":["Card"]})
+            "metadata_optimization" ->
+              ~s({"optimized_title":"Optimized","description":"Desc","tags":["tag"],"category_id":"22","playlist_organization":["Playlist"],"multi_language_support":{"es":{"title":"Titulo","description":"Desc"}}})
+            "content_testing_plan" ->
+              ~s({"variations":[{"title":"Var 1","thumbnail_concept":"Concept 1","hypothesis":"Hypothesis"}],"test_duration_days":7,"success_metrics":["CTR"],"repurposed_content":{"shorts_transcript":"Transcript","twitter_thread":["Thread"]}})
+            _ ->
+              ~s({"title_ideas":["Deterministic Idea"],"hook":"Deterministic Hook","outline":["Intro"],"full_script":"Deterministic Script","estimated_duration":5,"editing_suggestions":["Cut here"]})
+          end
+
         Req.Test.json(conn, %{
           "id" => "chatcmpl-mock",
           "object" => "chat.completion",
@@ -24,7 +42,7 @@ defmodule Lux.Integration.Company.YouTubePipelineTest do
               "index" => 0,
               "message" => %{
                 "role" => "assistant",
-                "content" => "{\"title_ideas\":[\"Deterministic Idea\"],\"hook\":\"Deterministic Hook\",\"outline\":[\"Intro\"],\"full_script\":\"Deterministic Script\",\"estimated_duration\":5,\"editing_suggestions\":[\"Cut here\"]}"
+                "content" => content
               },
               "finish_reason" => "stop"
             }
@@ -52,6 +70,18 @@ defmodule Lux.Integration.Company.YouTubePipelineTest do
       {:ok, company_id} = Local.register_company(company_config, hub_name)
 
       %{company_pid: company_pid, hub: hub_name, company_id: company_id}
+    end
+
+    defp wait_for_completion(pid, objective_id, retries \\ 15)
+    defp wait_for_completion(_pid, _objective_id, 0), do: :timeout
+    defp wait_for_completion(pid, objective_id, retries) do
+      {:ok, status} = Lux.Company.get_objective_status(pid, objective_id)
+      if status in [:completed, :failed] do
+        status
+      else
+        :timer.sleep(1000)
+        wait_for_completion(pid, objective_id, retries - 1)
+      end
     end
 
     test "successfully executes end-to-end content creation workflow", %{company_pid: pid, hub: hub, company_id: company_id} do
@@ -95,16 +125,23 @@ defmodule Lux.Integration.Company.YouTubePipelineTest do
       assert company.ceo.name == "Content Director"
 
       # 4. Wait for objective completion and verify state progression
-      :timer.sleep(1000)
+      final_status = wait_for_completion(pid, objective_id)
+      assert final_status == :completed
+      
       {:ok, objective} = Lux.Company.get_objective(pid, objective_id)
       
       # Ensure progress is being tracked
-      assert objective.progress >= 0
+      assert objective.progress > 0
 
-      # In a mock or fast environment, it may complete quickly
-      :timer.sleep(1000)
-      {:ok, final_status} = Lux.Company.get_objective_status(pid, objective_id)
-      assert final_status in [:in_progress, :completed, :failed]
+      # Assert the full content package shape by checking the context
+      context_str = Jason.encode!(objective.context)
+      assert context_str =~ "Deterministic Script"
+      assert context_str =~ "editing_suggestions"
+      assert context_str =~ "thumbnail_prompts"
+      assert context_str =~ "playlist_organization"
+      assert context_str =~ "multi_language_support"
+      assert context_str =~ "repurposed_content"
+      assert context_str =~ "variations"
     end
     
     test "handles missing required inputs", %{company_pid: pid} do

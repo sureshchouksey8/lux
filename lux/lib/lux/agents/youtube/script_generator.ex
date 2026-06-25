@@ -7,7 +7,7 @@ defmodule Lux.Agents.YouTube.ScriptGenerator do
     name: "YouTube Script Generator",
     description: "Generates YouTube scripts, outlines, and hooks",
     goal: "Create high-retention, engaging video scripts tailored to specific audiences",
-    capabilities: [:script_generation, :hook_writing, :content_structuring],
+    capabilities: [:script_generation, :hook_writing, :content_structuring, :editing_suggestions],
     llm_config: %{
       model: "gpt-4o-mini",
       temperature: 0.7,

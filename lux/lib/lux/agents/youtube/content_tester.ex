@@ -7,7 +7,7 @@ defmodule Lux.Agents.YouTube.ContentTester do
     name: "YouTube Content Tester",
     description: "Sets up A/B tests for thumbnails/titles and analyzes metrics",
     goal: "Evaluate content variations to identify top-performing combinations",
-    capabilities: [:ab_testing, :performance_analysis, :variation_generation],
+    capabilities: [:ab_testing, :performance_analysis, :variation_generation, :content_repurposing],
     llm_config: %{
       model: "gpt-4o-mini",
       temperature: 0.7,

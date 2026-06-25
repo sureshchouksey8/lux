@@ -15,6 +15,7 @@ defmodule Lux.Companies.YouTubePipeline do
       can("script_generation")
       can("hook_writing")
       can("content_structuring")
+      can("editing_suggestions")
     end
 
     members do
@@ -32,6 +33,8 @@ defmodule Lux.Companies.YouTubePipeline do
         can("seo_optimization")
         can("tag_generation")
         can("description_writing")
+        can("playlist_organization")
+        can("localization")
       end
 
       has_role "Content Tester" do
@@ -40,6 +43,7 @@ defmodule Lux.Companies.YouTubePipeline do
         can("ab_testing")
         can("performance_analysis")
         can("variation_generation")
+        can("content_repurposing")
       end
     end
   end
@@ -57,6 +61,10 @@ defmodule Lux.Companies.YouTubePipeline do
         "required_capabilities" => ["script_generation"]
       },
       %{
+        "name" => "Generate automated editing suggestions",
+        "required_capabilities" => ["editing_suggestions"]
+      },
+      %{
         "name" => "Propose visual optimization (thumbnails and b-roll) based on the script",
         "required_capabilities" => ["thumbnail_ideation"]
       },
@@ -65,8 +73,16 @@ defmodule Lux.Companies.YouTubePipeline do
         "required_capabilities" => ["seo_optimization"]
       },
       %{
+        "name" => "Organize playlists and generate localized metadata",
+        "required_capabilities" => ["playlist_organization", "localization"]
+      },
+      %{
         "name" => "Create an A/B testing plan for the generated assets",
         "required_capabilities" => ["ab_testing"]
+      },
+      %{
+        "name" => "Repurpose content for other platforms",
+        "required_capabilities" => ["content_repurposing"]
       }
     ])
 

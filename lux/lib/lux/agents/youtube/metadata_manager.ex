@@ -7,7 +7,7 @@ defmodule Lux.Agents.YouTube.MetadataManager do
     name: "YouTube Metadata Manager",
     description: "Optimizes SEO metadata for YouTube videos",
     goal: "Maximize search discovery and click-through rates via optimized metadata",
-    capabilities: [:seo_optimization, :tag_generation, :description_writing],
+    capabilities: [:seo_optimization, :tag_generation, :description_writing, :playlist_organization, :localization],
     llm_config: %{
       model: "gpt-4o-mini",
       temperature: 0.7,
