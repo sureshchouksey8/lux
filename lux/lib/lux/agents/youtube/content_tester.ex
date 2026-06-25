@@ -38,9 +38,21 @@ defmodule Lux.Agents.YouTube.ContentTester do
               type: "array",
               items: %{type: "string"},
               description: "Metrics to track (e.g., CTR, AVD)"
+            },
+            repurposed_content: %{
+              type: "object",
+              description: "Short-form content scripts and Twitter threads generated from the video brief",
+              properties: %{
+                "shorts_transcript" => %{type: "string"},
+                "twitter_thread" => %{
+                  type: "array",
+                  items: %{type: "string"}
+                }
+              },
+              required: ["shorts_transcript", "twitter_thread"]
             }
           },
-          required: ["variations", "test_duration_days", "success_metrics"]
+          required: ["variations", "test_duration_days", "success_metrics", "repurposed_content"]
         }
       },
       messages: [

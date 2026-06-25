@@ -12,6 +12,27 @@ defmodule Lux.Integration.Company.YouTubePipelineTest do
 
   describe "youtube content creation workflow" do
     setup do
+      # Set up deterministic Req stubs for the LLM API calls made by agents
+      Req.Test.stub(OpenAI, fn conn ->
+        Req.Test.json(conn, %{
+          "id" => "chatcmpl-mock",
+          "object" => "chat.completion",
+          "created" => 1_677_652_288,
+          "model" => "gpt-4o-mini",
+          "choices" => [
+            %{
+              "index" => 0,
+              "message" => %{
+                "role" => "assistant",
+                "content" => "{\"title_ideas\":[\"Deterministic Idea\"],\"hook\":\"Deterministic Hook\",\"outline\":[\"Intro\"],\"full_script\":\"Deterministic Script\",\"estimated_duration\":5,\"editing_suggestions\":[\"Cut here\"]}"
+              },
+              "finish_reason" => "stop"
+            }
+          ],
+          "usage" => %{"prompt_tokens" => 10, "completion_tokens" => 20, "total_tokens" => 30}
+        })
+      end)
+
       # Start a local hub for the company
       hub_name = :"hub_#{:erlang.unique_integer([:positive])}"
       table_name = :"table_#{:erlang.unique_integer([:positive])}"
@@ -22,10 +43,10 @@ defmodule Lux.Integration.Company.YouTubePipelineTest do
 
       # Start the company
       {:ok, company_pid} =
-        Lux.Company.start_link(YouTubePipeline, %{
+        Lux.Company.run(YouTubePipeline, [
           name: company_config.name,
           hub: hub_name
-        })
+        ])
 
       # Register the company with the hub
       {:ok, company_id} = Local.register_company(company_config, hub_name)

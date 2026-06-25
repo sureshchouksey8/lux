@@ -33,9 +33,29 @@ defmodule Lux.Agents.YouTube.MetadataManager do
             category_id: %{
               type: "string",
               description: "Recommended YouTube category ID (e.g., '22' for People & Blogs)"
+            },
+            playlist_organization: %{
+              type: "array",
+              items: %{type: "string"},
+              description: "Recommended playlists to add this video to"
+            },
+            multi_language_support: %{
+              type: "object",
+              description: "Translated titles and descriptions for multi-language audience reach",
+              properties: %{
+                "es" => %{
+                  type: "object",
+                  properties: %{
+                    title: %{type: "string"},
+                    description: %{type: "string"}
+                  },
+                  required: ["title", "description"]
+                }
+              },
+              required: ["es"]
             }
           },
-          required: ["optimized_title", "description", "tags", "category_id"]
+          required: ["optimized_title", "description", "tags", "category_id", "playlist_organization", "multi_language_support"]
         }
       },
       messages: [

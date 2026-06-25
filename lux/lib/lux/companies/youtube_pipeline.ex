@@ -52,10 +52,22 @@ defmodule Lux.Companies.YouTubePipeline do
     )
 
     steps([
-      "Generate the script and hook based on the topic",
-      "Propose visual optimization (thumbnails and b-roll) based on the script",
-      "Generate SEO-optimized metadata",
-      "Create an A/B testing plan for the generated assets"
+      %{
+        "name" => "Generate the script and hook based on the topic",
+        "required_capabilities" => ["script_generation"]
+      },
+      %{
+        "name" => "Propose visual optimization (thumbnails and b-roll) based on the script",
+        "required_capabilities" => ["thumbnail_ideation"]
+      },
+      %{
+        "name" => "Generate SEO-optimized metadata",
+        "required_capabilities" => ["seo_optimization"]
+      },
+      %{
+        "name" => "Create an A/B testing plan for the generated assets",
+        "required_capabilities" => ["ab_testing"]
+      }
     ])
 
     input(%{

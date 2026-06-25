@@ -38,9 +38,14 @@ defmodule Lux.Agents.YouTube.ScriptGenerator do
             estimated_duration: %{
               type: "number",
               description: "Estimated video duration in minutes"
+            },
+            editing_suggestions: %{
+              type: "array",
+              items: %{type: "string"},
+              description: "Automated suggestions for editing, graphics, sound effects, and transitions"
             }
           },
-          required: ["title_ideas", "hook", "outline", "full_script", "estimated_duration"]
+          required: ["title_ideas", "hook", "outline", "full_script", "estimated_duration", "editing_suggestions"]
         }
       },
       messages: [

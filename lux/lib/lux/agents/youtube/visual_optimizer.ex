@@ -35,9 +35,14 @@ defmodule Lux.Agents.YouTube.VisualOptimizer do
             end_screen_layout: %{
               type: "string",
               description: "Suggestion for end screen card placements"
+            },
+            card_placements: %{
+              type: "array",
+              items: %{type: "string"},
+              description: "Suggestions for info cards and poll placements with timestamps"
             }
           },
-          required: ["thumbnail_prompts", "broll_suggestions", "color_palette", "end_screen_layout"]
+          required: ["thumbnail_prompts", "broll_suggestions", "color_palette", "end_screen_layout", "card_placements"]
         }
       },
       messages: [
