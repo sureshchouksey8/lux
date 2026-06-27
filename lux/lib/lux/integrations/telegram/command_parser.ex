@@ -32,10 +32,11 @@ defmodule Lux.Integrations.Telegram.CommandParser do
         |> List.first()
 
       raw_args = List.first(rest) || ""
-      args = if raw_args == "", do: [], else: String.split(raw_args, ~r/\s+/)
+      
+      # Handle quoted args using OptionParser.split/1
+      tokens = OptionParser.split(raw_args)
 
-      # Parse flags if any (e.g. --key value or -k value)
-      flags = parse_flags(args)
+      {flags, args} = parse_tokens(tokens, %{}, [])
 
       {:ok, %{
         command: command,
@@ -61,15 +62,36 @@ defmodule Lux.Integrations.Telegram.CommandParser do
     end
   end
 
-  # Helper to parse --key value or -k value flags
-  defp parse_flags(args) do
-    parse_flags(args, %{})
+  defp parse_tokens([], flags, positional), do: {flags, Enum.reverse(positional)}
+
+  defp parse_tokens([flag | rest], flags, positional) when String.starts_with?(flag, "-") do
+    cond do
+      flag == "-" ->
+        parse_tokens(rest, flags, [flag | positional])
+
+      flag == "--" ->
+        # Treat all remaining tokens as positional arguments
+        {flags, Enum.reverse(positional) ++ rest}
+
+      String.contains?(flag, "=") ->
+        [k, v] = String.split(flag, "=", parts: 2)
+        key = String.replace(k, ~r/^-+/, "")
+        parse_tokens(rest, Map.put(flags, key, v), positional)
+
+      true ->
+        case rest do
+          [next | tail] when not String.starts_with?(next, "-") ->
+            key = String.replace(flag, ~r/^-+/, "")
+            parse_tokens(tail, Map.put(flags, key, next), positional)
+
+          _ ->
+            key = String.replace(flag, ~r/^-+/, "")
+            parse_tokens(rest, Map.put(flags, key, "true"), positional)
+        end
+    end
   end
 
-  defp parse_flags([], acc), do: acc
-  defp parse_flags([flag, val | rest], acc) when String.starts_with?(flag, "-") do
-    key = String.replace(flag, ~r/^-+/, "")
-    parse_flags(rest, Map.put(acc, key, val))
+  defp parse_tokens([arg | rest], flags, positional) do
+    parse_tokens(rest, flags, [arg | positional])
   end
-  defp parse_flags([_ | rest], acc), do: parse_flags(rest, acc)
 end

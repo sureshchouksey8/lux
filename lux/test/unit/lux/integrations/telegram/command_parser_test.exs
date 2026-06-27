@@ -20,10 +20,39 @@ defmodule Lux.Integrations.Telegram.CommandParserTest do
       assert res.args == ["payload"]
     end
 
-    test "parses flags correctly" do
-      assert {:ok, res} = CommandParser.parse("/add --item apple --qty 5")
+    test "parses flags correctly and separates positional args" do
+      assert {:ok, res} = CommandParser.parse("/add --item apple --qty 5 positional1 positional2")
       assert res.command == "add"
       assert res.flags == %{"item" => "apple", "qty" => "5"}
+      assert res.args == ["positional1", "positional2"]
+    end
+
+    test "handles boolean flags" do
+      assert {:ok, res} = CommandParser.parse("/cmd --force --verbose file.txt")
+      assert res.command == "cmd"
+      assert res.flags == %{"force" => "true", "verbose" => "true"}
+      assert res.args == ["file.txt"]
+    end
+
+    test "handles --key=value style flags" do
+      assert {:ok, res} = CommandParser.parse("/cmd --key1=value1 -k2=v2")
+      assert res.command == "cmd"
+      assert res.flags == %{"key1" => "value1", "k2" => "v2"}
+      assert res.args == []
+    end
+
+    test "handles quoted arguments" do
+      assert {:ok, res} = CommandParser.parse("/msg \"hello world\" --to \"John Doe\"")
+      assert res.command == "msg"
+      assert res.flags == %{"to" => "John Doe"}
+      assert res.args == ["hello world"]
+    end
+
+    test "handles malformed flags gracefully" do
+      assert {:ok, res} = CommandParser.parse("/cmd - -- --extra")
+      assert res.command == "cmd"
+      assert res.flags == %{}
+      assert res.args == ["-", "--extra"]
     end
 
     test "handles non-commands gracefully" do

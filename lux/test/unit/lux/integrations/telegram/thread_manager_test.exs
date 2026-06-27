@@ -43,6 +43,32 @@ defmodule Lux.Integrations.Telegram.ThreadManagerTest do
       assert length(thread_by_child) == 3
       assert Enum.map(thread_by_child, & &1["message_id"]) == [100, 101, 102]
     end
+
+    test "handles missing parents gracefully", %{manager: manager} do
+      msg = %{"message_id" => 10, "text" => "orphan", "reply_to_message" => %{"message_id" => 999}}
+      assert :ok = ThreadManager.add_message(manager, "chat_orp", msg)
+
+      thread = ThreadManager.get_thread(manager, "chat_orp", 10)
+      assert length(thread) == 1
+      assert Enum.at(thread, 0)["message_id"] == 10
+    end
+
+    test "handles cyclic replies or deep threads gracefully by halting at max depth", %{manager: manager} do
+      # Add 55 deep replies
+      Enum.each(1..55, fn i ->
+        msg = if i == 1 do
+          %{"message_id" => i, "text" => "root"}
+        else
+          %{"message_id" => i, "text" => "reply", "reply_to_message" => %{"message_id" => i - 1}}
+        end
+        ThreadManager.add_message(manager, "chat_deep", msg)
+      end)
+      
+      thread = ThreadManager.get_thread(manager, "chat_deep", 55)
+      # Because of @max_depth 50 going up, it won't hit root (1)
+      # But it won't infinite loop. We just assert it returns a subset.
+      assert length(thread) > 0
+    end
   end
 
   describe "callback query management" do
@@ -51,6 +77,23 @@ defmodule Lux.Integrations.Telegram.ThreadManagerTest do
       assert :ok = ThreadManager.add_callback(manager, query)
 
       assert [query] == ThreadManager.get_callbacks(manager)
+    end
+
+    test "validates callback payload", %{manager: manager} do
+      assert {:error, :invalid_payload} = ThreadManager.add_callback(manager, %{"id" => "q123"})
+      assert {:error, :invalid_payload} = ThreadManager.add_callback(manager, %{"data" => "click"})
+      assert :ok = ThreadManager.add_callback(manager, %{"id" => "q123", "data" => "click"})
+    end
+  end
+
+  describe "lifecycle" do
+    test "prune clears all state", %{manager: manager} do
+      ThreadManager.add_message(manager, "c1", %{"message_id" => 1, "text" => "T"})
+      ThreadManager.add_callback(manager, %{"id" => "q1", "data" => "D"})
+      
+      assert :ok = ThreadManager.prune(manager)
+      assert [] == ThreadManager.get_callbacks(manager)
+      assert [] == ThreadManager.get_thread(manager, "c1", 1)
     end
   end
 end

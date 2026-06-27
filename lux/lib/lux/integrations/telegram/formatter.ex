@@ -55,6 +55,13 @@ defmodule Lux.Integrations.Telegram.Formatter do
     "<a href=\"" <> escape_html(url) <> "\">" <> escape_html(text) <> "</a>"
   end
   def link(text, url, :markdown) do
-    "[" <> escape_markdown(text) <> "](" <> escape_markdown(url) <> ")"
+    "[" <> escape_markdown(text) <> "](" <> escape_url(url) <> ")"
   end
+
+  defp escape_url(url) when is_binary(url) do
+    url
+    |> String.replace("\\", "\\\\")
+    |> String.replace(")", "\\)")
+  end
+  defp escape_url(other), do: other
 end

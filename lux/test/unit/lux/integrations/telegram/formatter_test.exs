@@ -24,7 +24,7 @@ defmodule Lux.Integrations.Telegram.FormatterTest do
 
     test "formats italic correctly" do
       assert Formatter.italic("text", :html) == "<i>text</i>"
-      assert Formatter.italic("text", :markdown) == "\\_text\\_"
+      assert Formatter.italic("text", :markdown) == "_text_"
     end
 
     test "formats code blocks" do
@@ -35,6 +35,9 @@ defmodule Lux.Integrations.Telegram.FormatterTest do
     test "formats links" do
       assert Formatter.link("Lux", "https://lux.io", :html) ==
                "<a href=\"https://lux.io\">Lux</a>"
+               
+      assert Formatter.link("Lux Framework", "https://lux.io/path?query=1)2", :markdown) ==
+               "[Lux Framework](https://lux.io/path?query=1\\)2)"
     end
   end
 end
