@@ -88,13 +88,20 @@ defmodule Lux.Prisms.Telegram.Moderation.SetChatPermissions do
   end
 
   defp fetch_param(params, key) do
-    case Map.get(params, key) || Map.get(params, to_string(key)) do
-      nil -> {:error, "Missing or invalid #{key}"}
-      val -> {:ok, val}
+    case Map.fetch(params, key) do
+      {:ok, val} -> {:ok, val}
+      :error ->
+        case Map.fetch(params, to_string(key)) do
+          {:ok, val} -> {:ok, val}
+          :error -> {:error, "Missing or invalid #{key}"}
+        end
     end
   end
 
   defp fetch_optional(params, key) do
-    Map.get(params, key) || Map.get(params, to_string(key))
+    case Map.fetch(params, key) do
+      {:ok, val} -> val
+      :error -> Map.get(params, to_string(key))
+    end
   end
 end

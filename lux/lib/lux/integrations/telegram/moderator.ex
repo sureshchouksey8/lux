@@ -39,7 +39,7 @@ defmodule Lux.Integrations.Telegram.Moderator do
         user_id: user_id,
         username: user["username"] || "unknown",
         message_id: message_id,
-        text: text
+        reason: "spam_detected"
       })
 
       # 1. Delete message
