@@ -153,8 +153,8 @@ defmodule Lux.Integration.Company.CapabilityBasedWorkflowTest do
 
       # Verify relatively even distribution
       task_counts_list = Map.values(task_counts)
-      max_tasks = Enum.max(task_counts_list)
-      min_tasks = Enum.min(task_counts_list)
+      max_tasks = Enum.max(task_counts_list, fn -> 0 end)
+      min_tasks = Enum.min(task_counts_list, fn -> 0 end)
       assert max_tasks - min_tasks <= 1
     end
   end

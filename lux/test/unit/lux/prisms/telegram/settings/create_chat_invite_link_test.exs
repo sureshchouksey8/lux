@@ -44,5 +44,32 @@ defmodule Lux.Prisms.Telegram.Settings.CreateChatInviteLinkTest do
       assert response.invite_link == @invite_link
       assert response.name == "Promo Link"
     end
+
+    test "explicitly passes false values for creates_join_request" do
+      Req.Test.expect(TelegramClientMock, fn conn ->
+        assert conn.method == "POST"
+        {:ok, body, _conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        assert decoded["chat_id"] == @chat_id
+        assert decoded["creates_join_request"] == false
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode!(%{
+          "ok" => true,
+          "result" => %{
+            "invite_link" => @invite_link
+          }
+        }))
+      end)
+
+      assert {:ok, response} = CreateChatInviteLink.handler(%{
+        chat_id: @chat_id,
+        creates_join_request: false,
+        plug: {Req.Test, __MODULE__}
+      }, @agent_ctx)
+
+      assert response.invite_link == @invite_link
+    end
   end
 end

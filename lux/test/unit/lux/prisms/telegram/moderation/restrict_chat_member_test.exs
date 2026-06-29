@@ -65,5 +65,33 @@ defmodule Lux.Prisms.Telegram.Moderation.RestrictChatMemberTest do
 
       assert String.contains?(message, "Method restrictChatMember failed")
     end
+
+    test "explicitly passes false values for independent permissions" do
+      Req.Test.expect(TelegramClientMock, fn conn ->
+        assert conn.method == "POST"
+        {:ok, body, _conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        assert decoded["chat_id"] == @chat_id
+        assert decoded["user_id"] == @user_id
+        assert decoded["use_independent_chat_permissions"] == false
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode!(%{
+          "ok" => true,
+          "result" => true
+        }))
+      end)
+
+      assert {:ok, response} = RestrictChatMember.handler(%{
+        chat_id: @chat_id,
+        user_id: @user_id,
+        permissions: @permissions,
+        use_independent_chat_permissions: false,
+        plug: {Req.Test, __MODULE__}
+      }, @agent_ctx)
+
+      assert response.success == true
+    end
   end
 end
