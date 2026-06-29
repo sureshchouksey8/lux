@@ -156,9 +156,9 @@ defmodule Lux.Integration.Company.ContentTeamTest do
 
       if status == :failed do
         {:ok, obj_state} = Lux.Company.get_objective(pid, objective_id)
-        assert obj_state.error != nil
+        assert obj_state.metadata[:failure_reason] != nil
         # Should have error message
-        assert is_binary(obj_state.error)
+        assert is_binary(obj_state.metadata[:failure_reason])
       end
     end
 
