@@ -51,5 +51,22 @@ defmodule Lux.Prisms.TxMonitorPrismTest do
       input = %{chain: "ethereum", tx_hash: "0x123"}
       assert {:ok, %{status: "pending", receipt: nil}} = TxMonitorPrism.handler(input, nil)
     end
+
+    test "handles string-keyed inputs" do
+      Req.Test.expect(MultiChainRpcPrism, fn conn ->
+        {:ok, body, _} = Plug.Conn.read_body(conn)
+        json = Jason.decode!(body)
+        assert json["method"] == "eth_getTransactionReceipt"
+
+        Req.Test.json(conn, %{
+          "jsonrpc" => "2.0",
+          "id" => json["id"],
+          "result" => %{"status" => "0x1", "transactionHash" => "0x123"}
+        })
+      end)
+
+      input = %{"chain" => "ethereum", "tx_hash" => "0x123"}
+      assert {:ok, %{status: "success", receipt: %{"status" => "0x1"}}} = TxMonitorPrism.handler(input, nil)
+    end
   end
 end

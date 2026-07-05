@@ -40,5 +40,23 @@ defmodule Lux.Prisms.IndexerPrismTest do
       input = %{chain: "ethereum", contract_address: "0xabc"}
       assert {:ok, %{logs: []}} = IndexerPrism.handler(input, nil)
     end
+
+    test "handles string-keyed inputs" do
+      Req.Test.expect(MultiChainRpcPrism, fn conn ->
+        {:ok, body, _} = Plug.Conn.read_body(conn)
+        json = Jason.decode!(body)
+        assert json["method"] == "eth_getLogs"
+
+        Req.Test.json(conn, %{
+          "jsonrpc" => "2.0",
+          "id" => json["id"],
+          "result" => [%{"logIndex" => "0x1"}]
+        })
+      end)
+
+      input = %{"chain" => "ethereum", "contract_address" => "0xabc"}
+      assert {:ok, %{logs: logs}} = IndexerPrism.handler(input, nil)
+      assert length(logs) == 1
+    end
   end
 end

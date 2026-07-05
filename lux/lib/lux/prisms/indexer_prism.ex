@@ -45,34 +45,39 @@ defmodule Lux.Prisms.IndexerPrism do
       required: ["logs"]
     }
 
-  def handler(%{chain: chain, contract_address: contract_address} = input, ctx) do
-    from_block = Map.get(input, :from_block, "latest")
-    to_block = Map.get(input, :to_block, "latest")
-    topics = Map.get(input, :topics, [])
+  def handler(input, ctx) do
+    with {:ok, chain} <- fetch_param(input, :chain),
+         {:ok, contract_address} <- fetch_param(input, :contract_address) do
+      from_block = get_param(input, :from_block, "latest")
+      to_block = get_param(input, :to_block, "latest")
+      topics = get_param(input, :topics, [])
 
-    filter = %{
-      address: contract_address,
-      fromBlock: from_block,
-      toBlock: to_block
-    }
+      filter = %{address: contract_address, fromBlock: from_block, toBlock: to_block}
+      filter = if Enum.empty?(topics), do: filter, else: Map.put(filter, :topics, topics)
 
-    filter = if Enum.empty?(topics), do: filter, else: Map.put(filter, :topics, topics)
+      Lux.Prisms.MultiChainRpcPrism.handler(%{chain: chain, method: "eth_getLogs", params: [filter]}, ctx)
+      |> case do
+        {:ok, %{result: logs}} when is_list(logs) -> {:ok, %{logs: logs}}
+        {:ok, %{result: nil}} -> {:ok, %{logs: []}}
+        {:error, error} -> {:error, "Failed to index logs: #{error}"}
+      end
+    end
+  end
 
-    rpc_input = %{
-      chain: chain,
-      method: "eth_getLogs",
-      params: [filter]
-    }
+  defp fetch_param(params, key) do
+    string_key = Atom.to_string(key)
 
-    case Lux.Prisms.MultiChainRpcPrism.handler(rpc_input, ctx) do
-      {:ok, %{result: logs}} when is_list(logs) ->
-        {:ok, %{logs: logs}}
+    cond do
+      Map.has_key?(params, key) -> {:ok, Map.fetch!(params, key)}
+      Map.has_key?(params, string_key) -> {:ok, Map.fetch!(params, string_key)}
+      true -> {:error, "#{string_key} is required"}
+    end
+  end
 
-      {:ok, %{result: nil}} ->
-        {:ok, %{logs: []}}
-
-      {:error, error} ->
-        {:error, "Failed to index logs: #{error}"}
+  defp get_param(params, key, default \\ nil) do
+    case fetch_param(params, key) do
+      {:ok, value} -> value
+      {:error, _} -> default
     end
   end
 end

@@ -1,6 +1,6 @@
 # Multi-Chain Data Aggregation
 
-The Multi-Chain Data Aggregation module provides core primitives for interacting with JSON-RPC nodes across different blockchain networks in a unified way. 
+The Multi-Chain Data Aggregation module provides core primitives for interacting with JSON-RPC nodes across different blockchain networks in a unified way.
 
 ## Supported Chains
 - `ethereum` (Ethereum Mainnet)

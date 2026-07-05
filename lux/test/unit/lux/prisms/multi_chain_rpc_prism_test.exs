@@ -5,12 +5,12 @@ defmodule Lux.Prisms.MultiChainRpcPrismTest do
 
   setup do
     Req.Test.verify_on_exit!()
-    
+
     existing_req_options = Application.get_env(:lux, :req_options)
-    
+
     # Override configuration to use the mock plug for the test
     Application.put_env(:lux, :req_options, plug: {Req.Test, MultiChainRpcPrism})
-    
+
     on_exit(fn ->
       if existing_req_options do
         Application.put_env(:lux, :req_options, existing_req_options)
@@ -18,7 +18,7 @@ defmodule Lux.Prisms.MultiChainRpcPrismTest do
         Application.delete_env(:lux, :req_options)
       end
     end)
-    
+
     :ok
   end
 
