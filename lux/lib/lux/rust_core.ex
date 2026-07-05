@@ -18,4 +18,10 @@ defmodule Lux.RustCore do
   Accepts a string, processes it in Rust, and safely returns it.
   """
   def compute_complex_task(_data), do: :erlang.nif_error(:nif_not_loaded)
+
+  @doc """
+  Executes a Rust component asynchronously.
+  This demonstrates lifecycle management and execution of native Rust components.
+  """
+  def execute_math_prism(_a, _b), do: :erlang.nif_error(:nif_not_loaded)
 end

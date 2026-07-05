@@ -1,5 +1,8 @@
+pub mod components;
+
 use rustler::{Encoder, Env, Error, NifResult, Term};
 use thiserror::Error;
+use components::{Component, MathPrism};
 
 rustler::atoms! {
     error,
@@ -47,4 +50,18 @@ fn compute_complex_task(data: String) -> Result<String, LuxError> {
     Ok(processed)
 }
 
-rustler::init!("Elixir.Lux.RustCore", [add, compute_complex_task]);
+/// Example NIF to execute a Rust component asynchronously.
+/// In a real framework, this would be a generic executor bridging Elixir messages and Rust async tasks.
+#[rustler::nif(schedule = "DirtyIo")]
+fn execute_math_prism(a: i64, b: i64) -> Result<i64, Error> {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let mut prism = MathPrism;
+        prism.init().await?;
+        let res = prism.execute((a, b)).await?;
+        prism.terminate().await?;
+        Ok(res)
+    })
+}
+
+rustler::init!("Elixir.Lux.RustCore", [add, compute_complex_task, execute_math_prism]);

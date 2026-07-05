@@ -45,3 +45,57 @@ pub enum LuxError {
 ```
 
 This guarantees safety and consistency across the language boundaries.
+
+## Rust Components (Prisms & Beams)
+
+Lux supports implementing high-performance native components (Prisms and Beams) directly in Rust, with full framework integration. This is facilitated by the `Component` trait, which provides lifecycle management and `async`/`await` support out of the box using `tokio`.
+
+### The Component Trait
+
+The core of Rust component definition is the `Component` trait, which defines the standard lifecycle:
+
+```rust
+use async_trait::async_trait;
+
+#[async_trait]
+pub trait Component {
+    type Input;
+    type Output;
+
+    async fn init(&mut self) -> Result<(), ComponentError> { Ok(()) }
+    async fn execute(&self, input: Self::Input) -> Result<Self::Output, ComponentError>;
+    async fn terminate(&mut self) -> Result<(), ComponentError> { Ok(()) }
+}
+```
+
+### Example: Rust Math Prism
+
+You can define a Rust component for computationally heavy operations, such as mathematical calculations or data processing.
+
+```rust
+use async_trait::async_trait;
+use crate::components::{Component, ComponentError};
+
+pub struct MathPrism;
+
+#[async_trait]
+impl Component for MathPrism {
+    type Input = (i64, i64);
+    type Output = i64;
+
+    async fn execute(&self, input: Self::Input) -> Result<Self::Output, ComponentError> {
+        let (a, b) = input;
+        a.checked_add(b)
+            .ok_or_else(|| ComponentError::Execution("Integer overflow".to_string()))
+    }
+}
+```
+
+### Elixir Integration
+
+These Rust components can then be seamlessly executed from Elixir using Rustler NIFs. We can use dirty schedulers for performance optimizations:
+
+```elixir
+iex> Lux.RustCore.execute_math_prism(10, 20)
+{:ok, 30}
+```
