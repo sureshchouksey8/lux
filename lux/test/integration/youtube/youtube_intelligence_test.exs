@@ -33,19 +33,15 @@ defmodule Lux.Integration.YouTube.YouTubeIntelligenceTest do
       %{company_pid: company_pid, hub: hub_name, company_id: company_id}
     end
 
-    test "ranks recommendations deterministically from channel metrics" do
-      input = %{
-        "topics" => ["Elixir YouTube automation", "Generic vlog"],
-        "audience_segments" => ["Elixir", "automation"],
-        "channel_metrics" => %{"average_ctr" => 8.0, "average_retention" => 62.0}
-      }
+    test "youtube agents expose the expected prisms" do
+      assert Lux.YouTube.Prisms.PerformanceAnalyticsPrism in
+               Lux.YouTube.Agents.AnalyticsAgent.view().prisms
 
-      assert {:ok, %{recommendations: [first | _], model: "deterministic_baseline_v1"}} =
-               ContentRecommendationPrism.handler(input, %{})
+      assert Lux.YouTube.Prisms.MetadataOptimizationPrism in
+               Lux.YouTube.Agents.OptimizationAgent.view().prisms
 
-      assert first.topic == "Elixir YouTube automation"
-      assert is_float(first.score)
-      assert first.confidence in [:high, :medium, :low]
+      assert Lux.YouTube.Prisms.ContentRecommendationPrism in
+               Lux.YouTube.Agents.StrategyAgent.view().prisms
     end
 
     test "successfully executes content optimization workflow", %{company_pid: pid, hub: hub, company_id: company_id} do

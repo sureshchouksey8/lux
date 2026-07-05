@@ -5,7 +5,7 @@ The YouTube Content Intelligence System is a multi-agent application built on to
 ## Core Features
 - **Video performance analytics**: Analyzes past video performance using heuristic scoring to predict success.
 - **Audience engagement analysis**: Determines audience retention and loyalty.
-- **Content recommendation engine**: Recommends potential topics based on search volume and competition.
+- **Content recommendation engine**: Ranks candidate topics using a deterministic baseline model based on channel CTR, retention, and audience fit.
 - **Optimal posting time prediction**: Suggests the best times to post for a given demographic.
 - **Title and thumbnail optimization**: Generates highly clickable titles and provides visual thumbnail ideas.
 - **Tag optimization**: Creates SEO-optimized tags based on trends and the specific video topic.
