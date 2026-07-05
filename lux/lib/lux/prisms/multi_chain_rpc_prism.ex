@@ -39,8 +39,10 @@ defmodule Lux.Prisms.MultiChainRpcPrism do
       required: ["result", "chain"]
     }
 
-  def handler(%{chain: chain, method: method} = input, _ctx) do
-    params = Map.get(input, :params, [])
+  def handler(input, _ctx) do
+    chain = Map.get(input, :chain) || Map.get(input, "chain")
+    method = Map.get(input, :method) || Map.get(input, "method")
+    params = Map.get(input, :params) || Map.get(input, "params") || []
     rpc_url = get_rpc_url(chain)
 
     if rpc_url do
@@ -75,5 +77,7 @@ defmodule Lux.Prisms.MultiChainRpcPrism do
   defp get_rpc_url("ethereum"), do: Application.get_env(:lux, :eth_rpc_url, "https://cloudflare-eth.com")
   defp get_rpc_url("polygon"), do: Application.get_env(:lux, :polygon_rpc_url, "https://polygon-rpc.com")
   defp get_rpc_url("arbitrum"), do: Application.get_env(:lux, :arbitrum_rpc_url, "https://arb1.arbitrum.io/rpc")
+  defp get_rpc_url("bsc"), do: Application.get_env(:lux, :bsc_rpc_url, "https://bsc-dataseed.binance.org")
+  defp get_rpc_url("binance_smart_chain"), do: get_rpc_url("bsc")
   defp get_rpc_url(_), do: nil
 end
