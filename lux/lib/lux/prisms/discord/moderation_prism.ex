@@ -26,9 +26,9 @@ defmodule Lux.Prisms.Discord.ModerationPrism do
           type: :string,
           description: "ISO8601 timestamp for timeout (for timeout action, or null to remove)."
         },
-        delete_message_days: %{
+        delete_message_seconds: %{
           type: :integer,
-          description: "Number of days to delete messages (for ban)."
+          description: "Number of seconds to delete messages (for ban)."
         },
         reason: %{
           type: :string,
@@ -51,9 +51,9 @@ defmodule Lux.Prisms.Discord.ModerationPrism do
   alias Lux.Integrations.Discord.Client
 
   def handler(params, _ctx) do
-    action = Map.fetch!(params, :action)
-    guild_id = Map.fetch!(params, :guild_id)
-    user_id = Map.fetch!(params, :user_id)
+    with {:ok, action} <- fetch_param(params, :action),
+         {:ok, guild_id} <- fetch_param(params, :guild_id),
+         {:ok, user_id} <- fetch_param(params, :user_id) do
 
     case action do
       "timeout" -> timeout_user(guild_id, user_id, params)
@@ -63,9 +63,10 @@ defmodule Lux.Prisms.Discord.ModerationPrism do
       _ -> {:error, "Invalid action"}
     end
   end
+  end
 
   defp timeout_user(guild_id, user_id, params) do
-    payload = %{communication_disabled_until: Map.get(params, :communication_disabled_until)}
+    payload = %{communication_disabled_until: get_param(params, :communication_disabled_until)}
 
     with_retry(fn ->
       Client.request(:patch, "/guilds/#{guild_id}/members/#{user_id}", %{json: payload})
@@ -74,10 +75,14 @@ defmodule Lux.Prisms.Discord.ModerationPrism do
   end
 
   defp ban_user(guild_id, user_id, params) do
-    payload = Map.take(params, [:delete_message_days])
+    delete_seconds =
+      get_param(params, :delete_message_seconds) ||
+        (get_param(params, :delete_message_days, 0) * 86_400)
+
+    payload = %{delete_message_seconds: min(delete_seconds, 604_800)}
 
     opts = %{json: payload}
-    opts = if Map.has_key?(params, :reason), do: Map.put(opts, :headers, [{"X-Audit-Log-Reason", params.reason}]), else: opts
+    opts = maybe_add_audit_reason(opts, get_param(params, :reason))
 
     with_retry(fn ->
       Client.request(:put, "/guilds/#{guild_id}/bans/#{user_id}", opts)
@@ -120,6 +125,28 @@ defmodule Lux.Prisms.Discord.ModerationPrism do
 
       other ->
         other
+    end
+  end
+
+  defp maybe_add_audit_reason(opts, nil), do: opts
+  defp maybe_add_audit_reason(opts, reason) do
+    Map.put(opts, :headers, [{"X-Audit-Log-Reason", URI.encode(reason)}])
+  end
+
+  defp fetch_param(params, key) do
+    string_key = Atom.to_string(key)
+
+    cond do
+      Map.has_key?(params, key) -> {:ok, Map.fetch!(params, key)}
+      Map.has_key?(params, string_key) -> {:ok, Map.fetch!(params, string_key)}
+      true -> {:error, "#{string_key} is required"}
+    end
+  end
+
+  defp get_param(params, key, default \\ nil) do
+    case fetch_param(params, key) do
+      {:ok, value} -> value
+      {:error, _} -> default
     end
   end
 end

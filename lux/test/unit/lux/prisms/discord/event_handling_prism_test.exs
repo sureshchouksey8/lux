@@ -81,5 +81,23 @@ defmodule Lux.Prisms.Discord.EventHandlingPrismTest do
         @agent_ctx
       )
     end
+    test "returns error instead of raising when required params are missing" do
+      assert {:error, "action is required"} =
+               EventHandlingPrism.handler(%{}, @agent_ctx)
+    end
+
+    test "accepts string-keyed tool input" do
+      Req.Test.expect(DiscordClientMock, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode!(%{"id" => @event_id, "name" => "test-event"}))
+      end)
+
+      assert {:ok, %{status: "success"}} =
+               EventHandlingPrism.handler(
+                 %{"action" => "create", "guild_id" => @guild_id, "name" => "test-event", "privacy_level" => 2},
+                 @agent_ctx
+               )
+    end
   end
 end
