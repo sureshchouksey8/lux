@@ -60,7 +60,7 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
   alias Lux.Integrations.Discord.Client
 
   def handler(params, _ctx) do
-    action = Map.fetch!(params, :action)
+    with {:ok, action} <- fetch_param(params, :action) do
 
     case action do
       "create" -> create_channel(params)
@@ -70,9 +70,10 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
       _ -> {:error, "Invalid action"}
     end
   end
+  end
 
   defp create_channel(params) do
-    case Map.fetch(params, :guild_id) do
+    case fetch_param(params, :guild_id) do
       {:ok, guild_id} ->
         payload = Map.take(params, [:name, :type, :permission_overwrites])
         with_retry(fn ->
@@ -86,7 +87,7 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
   end
 
   defp update_channel(params) do
-    case Map.fetch(params, :channel_id) do
+    case fetch_param(params, :channel_id) do
       {:ok, channel_id} ->
         payload = Map.take(params, [:name, :archived, :permission_overwrites])
         with_retry(fn ->
@@ -100,7 +101,7 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
   end
 
   defp delete_channel(params) do
-    case Map.fetch(params, :channel_id) do
+    case fetch_param(params, :channel_id) do
       {:ok, channel_id} ->
         with_retry(fn ->
           Client.request(:delete, "/channels/#{channel_id}")
@@ -113,7 +114,7 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
   end
 
   defp get_channel(params) do
-    case Map.fetch(params, :channel_id) do
+    case fetch_param(params, :channel_id) do
       {:ok, channel_id} ->
         with_retry(fn ->
           Client.request(:get, "/channels/#{channel_id}")
@@ -141,6 +142,23 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
 
       other ->
         other
+    end
+  end
+
+  defp fetch_param(params, key) do
+    string_key = Atom.to_string(key)
+
+    cond do
+      Map.has_key?(params, key) -> {:ok, Map.fetch!(params, key)}
+      Map.has_key?(params, string_key) -> {:ok, Map.fetch!(params, string_key)}
+      true -> {:error, "#{string_key} is required"}
+    end
+  end
+
+  defp get_param(params, key, default \\ nil) do
+    case fetch_param(params, key) do
+      {:ok, value} -> value
+      {:error, _} -> default
     end
   end
 end

@@ -56,8 +56,8 @@ defmodule Lux.Prisms.Discord.MessageManagementPrism do
   alias Lux.Integrations.Discord.Client
 
   def handler(params, _ctx) do
-    action = Map.fetch!(params, :action)
-    channel_id = Map.fetch!(params, :channel_id)
+    with {:ok, action} <- fetch_param(params, :action),
+         {:ok, channel_id} <- fetch_param(params, :channel_id) do
 
     case action do
       "create" -> create_message(channel_id, params)
@@ -68,9 +68,10 @@ defmodule Lux.Prisms.Discord.MessageManagementPrism do
       _ -> {:error, "Invalid action"}
     end
   end
+  end
 
   defp create_message(channel_id, params) do
-    case Map.fetch(params, :content) do
+    case fetch_param(params, :content) do
       {:ok, content} ->
         with_retry(fn ->
           Client.request(:post, "/channels/#{channel_id}/messages", %{json: %{content: content}})
@@ -83,8 +84,8 @@ defmodule Lux.Prisms.Discord.MessageManagementPrism do
   end
 
   defp edit_message(channel_id, params) do
-    with {:ok, message_id} <- Map.fetch(params, :message_id),
-         {:ok, content} <- Map.fetch(params, :content) do
+    with {:ok, message_id} <- fetch_param(params, :message_id),
+         {:ok, content} <- fetch_param(params, :content) do
       with_retry(fn ->
         Client.request(:patch, "/channels/#{channel_id}/messages/#{message_id}", %{
           json: %{content: content}
@@ -97,7 +98,7 @@ defmodule Lux.Prisms.Discord.MessageManagementPrism do
   end
 
   defp delete_message(channel_id, params) do
-    case Map.fetch(params, :message_id) do
+    case fetch_param(params, :message_id) do
       {:ok, message_id} ->
         with_retry(fn ->
           Client.request(:delete, "/channels/#{channel_id}/messages/#{message_id}")
@@ -110,7 +111,7 @@ defmodule Lux.Prisms.Discord.MessageManagementPrism do
   end
 
   defp bulk_delete_messages(channel_id, params) do
-    case Map.fetch(params, :message_ids) do
+    case fetch_param(params, :message_ids) do
       {:ok, message_ids} when is_list(message_ids) ->
         with_retry(fn ->
           Client.request(:post, "/channels/#{channel_id}/messages/bulk-delete", %{
@@ -125,7 +126,7 @@ defmodule Lux.Prisms.Discord.MessageManagementPrism do
   end
 
   defp fetch_history(channel_id, params) do
-    limit = Map.get(params, :limit, 50)
+    limit = get_param(params, :limit, 50)
 
     with_retry(fn ->
       Client.request(:get, "/channels/#{channel_id}/messages?limit=#{limit}")
@@ -155,6 +156,23 @@ defmodule Lux.Prisms.Discord.MessageManagementPrism do
 
       other ->
         other
+    end
+  end
+
+  defp fetch_param(params, key) do
+    string_key = Atom.to_string(key)
+
+    cond do
+      Map.has_key?(params, key) -> {:ok, Map.fetch!(params, key)}
+      Map.has_key?(params, string_key) -> {:ok, Map.fetch!(params, string_key)}
+      true -> {:error, "#{string_key} is required"}
+    end
+  end
+
+  defp get_param(params, key, default \\ nil) do
+    case fetch_param(params, key) do
+      {:ok, value} -> value
+      {:error, _} -> default
     end
   end
 end

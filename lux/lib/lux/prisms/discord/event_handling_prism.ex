@@ -75,8 +75,8 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
   alias Lux.Integrations.Discord.Client
 
   def handler(params, _ctx) do
-    action = Map.fetch!(params, :action)
-    guild_id = Map.fetch!(params, :guild_id)
+    with {:ok, action} <- fetch_param(params, :action),
+         {:ok, guild_id} <- fetch_param(params, :guild_id) do
 
     case action do
       "create" -> create_event(guild_id, params)
@@ -85,6 +85,7 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
       "list" -> list_events(guild_id)
       _ -> {:error, "Invalid action"}
     end
+  end
   end
 
   defp create_event(guild_id, params) do
@@ -100,7 +101,7 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
   end
 
   defp update_event(guild_id, params) do
-    case Map.fetch(params, :event_id) do
+    case fetch_param(params, :event_id) do
       {:ok, event_id} ->
         payload = Map.take(params, [
           :name, :privacy_level, :scheduled_start_time, :scheduled_end_time,
@@ -118,7 +119,7 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
   end
 
   defp delete_event(guild_id, params) do
-    case Map.fetch(params, :event_id) do
+    case fetch_param(params, :event_id) do
       {:ok, event_id} ->
         with_retry(fn ->
           Client.request(:delete, "/guilds/#{guild_id}/scheduled-events/#{event_id}")
@@ -159,6 +160,23 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
 
       other ->
         other
+    end
+  end
+
+  defp fetch_param(params, key) do
+    string_key = Atom.to_string(key)
+
+    cond do
+      Map.has_key?(params, key) -> {:ok, Map.fetch!(params, key)}
+      Map.has_key?(params, string_key) -> {:ok, Map.fetch!(params, string_key)}
+      true -> {:error, "#{string_key} is required"}
+    end
+  end
+
+  defp get_param(params, key, default \\ nil) do
+    case fetch_param(params, key) do
+      {:ok, value} -> value
+      {:error, _} -> default
     end
   end
 end

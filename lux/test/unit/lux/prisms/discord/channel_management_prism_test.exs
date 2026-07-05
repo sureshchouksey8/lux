@@ -81,5 +81,23 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrismTest do
         @agent_ctx
       )
     end
+    test "returns error instead of raising when required params are missing" do
+      assert {:error, "action is required"} =
+               ChannelManagementPrism.handler(%{}, @agent_ctx)
+    end
+
+    test "accepts string-keyed tool input" do
+      Req.Test.expect(DiscordClientMock, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode!(%{"id" => @channel_id, "name" => "test-channel"}))
+      end)
+
+      assert {:ok, %{status: "success"}} =
+               ChannelManagementPrism.handler(
+                 %{"action" => "create", "guild_id" => @guild_id, "name" => "test-channel", "type" => 0},
+                 @agent_ctx
+               )
+    end
   end
 end

@@ -38,7 +38,7 @@ defmodule Lux.Prisms.Discord.ModerationPrismTest do
         assert Plug.Conn.get_req_header(conn, "x-audit-log-reason") == ["spam"]
 
         {:ok, body, conn} = Plug.Conn.read_body(conn)
-        assert Jason.decode!(body) == %{"delete_message_days" => 1}
+        assert Jason.decode!(body) == %{"delete_message_seconds" => 86400}
 
         conn
         |> Plug.Conn.put_resp_content_type("application/json")
@@ -81,6 +81,24 @@ defmodule Lux.Prisms.Discord.ModerationPrismTest do
         %{action: "kick", guild_id: @guild_id, user_id: @user_id},
         @agent_ctx
       )
+    end
+    test "returns error instead of raising when required params are missing" do
+      assert {:error, "action is required"} =
+               ModerationPrism.handler(%{}, @agent_ctx)
+    end
+
+    test "accepts string-keyed tool input" do
+      Req.Test.expect(DiscordClientMock, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(204, "")
+      end)
+
+      assert {:ok, %{status: "success"}} =
+               ModerationPrism.handler(
+                 %{"action" => "kick", "guild_id" => @guild_id, "user_id" => @user_id},
+                 @agent_ctx
+               )
     end
   end
 end
