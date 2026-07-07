@@ -117,9 +117,14 @@ defmodule Lux.Prisms.Discord.ModerationPrism do
 
   defp with_retry(func, retries \\ 3) do
     case func.() do
-      {:error, {429, _msg}} when retries > 0 ->
+      {:error, {429, msg}} when retries > 0 ->
         unless Application.get_env(:lux, :env) == :test do
-          Process.sleep(100)
+          delay =
+            case msg do
+              %{"retry_after" => r} when is_number(r) -> trunc(r * 1000)
+              _ -> 100
+            end
+          Process.sleep(delay)
         end
         with_retry(func, retries - 1)
 
@@ -131,6 +136,13 @@ defmodule Lux.Prisms.Discord.ModerationPrism do
   defp maybe_add_audit_reason(opts, nil), do: opts
   defp maybe_add_audit_reason(opts, reason) do
     Map.put(opts, :headers, [{"X-Audit-Log-Reason", URI.encode(reason)}])
+  end
+
+  defp normalize_keys(params) do
+    Map.new(params, fn
+      {k, v} when is_binary(k) -> {String.to_atom(k), v}
+      {k, v} -> {k, v}
+    end)
   end
 
   defp fetch_param(params, key) do

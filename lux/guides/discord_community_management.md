@@ -2,6 +2,8 @@
 
 The Discord community management prisms allow your Lux agents to interact with Discord servers seamlessly. This guide covers how to use the prisms for managing messages, channels, moderation actions, and scheduled events.
 
+**Note:** This implementation is Prism-only (representing a reduced scope for Issue #57) to provide the foundational operations before adding full Lens, Agent, and tool support.
+
 ## Core Prisms
 
 1. **MessageManagementPrism**: Create, edit, delete, bulk delete, and fetch message history.
