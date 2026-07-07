@@ -37,6 +37,7 @@ defmodule Lux.Prisms.YouTube.ReplyToCommentTest do
       }} = ReplyToComment.handler(%{
         parent_id: "parent123",
         text: "Thanks!",
+        dry_run: false,
         plug: YouTubeClient
       }, %{name: "TestAgent"})
     end

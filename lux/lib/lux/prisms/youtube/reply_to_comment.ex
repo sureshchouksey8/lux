@@ -16,6 +16,11 @@ defmodule Lux.Prisms.YouTube.ReplyToComment do
         text: %{
           type: :string,
           description: "The text of the reply"
+        },
+        dry_run: %{
+          type: :boolean,
+          description: "If true (default), performs a dry-run and returns a mock response without calling YouTube API. Set to false for live API calls.",
+          default: true
         }
       },
       required: ["parent_id", "text"]
@@ -48,7 +53,7 @@ defmodule Lux.Prisms.YouTube.ReplyToComment do
       agent_name = agent[:name] || "Unknown Agent"
       access_token = Map.get(params, :access_token)
       plug = Map.get(params, :plug)
-      dry_run = Map.get(params, :dry_run)
+      dry_run = Map.get(params, :dry_run, true)
 
       Logger.info("Agent #{agent_name} replying to comment #{parent_id}")
 

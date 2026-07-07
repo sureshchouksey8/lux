@@ -29,6 +29,7 @@ defmodule Lux.Prisms.YouTube.ModerateCommentTest do
         comment_id: "comment123",
         moderation_status: "rejected",
         ban_author: true,
+        dry_run: false,
         plug: YouTubeClient
       }, %{name: "TestAgent"})
     end

@@ -22,6 +22,11 @@ defmodule Lux.Prisms.YouTube.ModerateComment do
           type: :boolean,
           description: "Whether to ban the author from the channel",
           default: false
+        },
+        dry_run: %{
+          type: :boolean,
+          description: "If true (default), performs a dry-run and returns a mock response without calling YouTube API. Set to false for live API calls.",
+          default: true
         }
       },
       required: ["comment_id", "moderation_status"]
@@ -50,7 +55,7 @@ defmodule Lux.Prisms.YouTube.ModerateComment do
       agent_name = agent[:name] || "Unknown Agent"
       access_token = Map.get(params, :access_token)
       plug = Map.get(params, :plug)
-      dry_run = Map.get(params, :dry_run)
+      dry_run = Map.get(params, :dry_run, true)
       ban_author = Map.get(params, :ban_author, false)
 
       Logger.info("Agent #{agent_name} moderating comment #{comment_id} to #{moderation_status}")
