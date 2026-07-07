@@ -89,7 +89,7 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
   end
 
   defp create_event(guild_id, params) do
-    payload = Map.take(params, [
+    payload = Map.take(normalize_keys(params), [
       :name, :privacy_level, :scheduled_start_time, :scheduled_end_time,
       :description, :entity_type, :channel_id, :entity_metadata
     ])
@@ -103,7 +103,7 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
   defp update_event(guild_id, params) do
     case fetch_param(params, :event_id) do
       {:ok, event_id} ->
-        payload = Map.take(params, [
+        payload = Map.take(normalize_keys(params), [
           :name, :privacy_level, :scheduled_start_time, :scheduled_end_time,
           :description, :entity_type, :channel_id, :entity_metadata
         ])
@@ -152,15 +152,27 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
 
   defp with_retry(func, retries \\ 3) do
     case func.() do
-      {:error, {429, _msg}} when retries > 0 ->
+      {:error, {429, msg}} when retries > 0 ->
         unless Application.get_env(:lux, :env) == :test do
-          Process.sleep(100)
+          delay =
+            case msg do
+              %{"retry_after" => r} when is_number(r) -> trunc(r * 1000)
+              _ -> 100
+            end
+          Process.sleep(delay)
         end
         with_retry(func, retries - 1)
 
       other ->
         other
     end
+  end
+
+  defp normalize_keys(params) do
+    Map.new(params, fn
+      {k, v} when is_binary(k) -> {String.to_atom(k), v}
+      {k, v} -> {k, v}
+    end)
   end
 
   defp fetch_param(params, key) do
