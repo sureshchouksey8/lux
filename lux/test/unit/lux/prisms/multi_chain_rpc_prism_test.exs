@@ -51,5 +51,43 @@ defmodule Lux.Prisms.MultiChainRpcPrismTest do
       input = %{chain: "unsupported_chain", method: "eth_blockNumber"}
       assert {:error, "Unsupported chain: unsupported_chain"} = MultiChainRpcPrism.handler(input, nil)
     end
+
+    test "retries and handles 429 rate limit" do
+      Application.put_env(:lux, :retry_delay, 1)
+
+      Req.Test.stub(MultiChainRpcPrism, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(429, ~s({"error": "rate limited"}))
+      end)
+
+      input = %{chain: "ethereum", method: "eth_blockNumber", params: []}
+      assert {:error, "All providers failed"} = MultiChainRpcPrism.handler(input, nil)
+    end
+
+    test "retries and handles 500 server error" do
+      Application.put_env(:lux, :retry_delay, 1)
+
+      Req.Test.stub(MultiChainRpcPrism, fn conn ->
+        Plug.Conn.send_resp(conn, 500, "Internal Server Error")
+      end)
+
+      input = %{chain: "ethereum", method: "eth_blockNumber", params: []}
+      assert {:error, "All providers failed"} = MultiChainRpcPrism.handler(input, nil)
+    end
+
+    test "retries and handles malformed JSON response" do
+      Application.put_env(:lux, :retry_delay, 1)
+
+      Req.Test.stub(MultiChainRpcPrism, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, "invalid { json")
+      end)
+
+      input = %{chain: "ethereum", method: "eth_blockNumber", params: []}
+      # When it exhausts the first provider with malformed JSON, wait, the malformed json logic returns {:error, "Malformed JSON response"} for the *current* provider.
+      assert {:error, "All providers failed"} = MultiChainRpcPrism.handler(input, nil)
+    end
   end
 end

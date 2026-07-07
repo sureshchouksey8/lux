@@ -57,9 +57,28 @@ defmodule Lux.Prisms.IndexerPrism do
 
       Lux.Prisms.MultiChainRpcPrism.handler(%{chain: chain, method: "eth_getLogs", params: [filter]}, ctx)
       |> case do
-        {:ok, %{result: logs}} when is_list(logs) -> {:ok, %{logs: logs}}
-        {:ok, %{result: nil}} -> {:ok, %{logs: []}}
-        {:error, error} -> {:error, "Failed to index logs: #{error}"}
+        {:ok, %{result: logs}} when is_list(logs) -> 
+          normalized_logs = Enum.map(logs, fn log ->
+            %Lux.Schemas.MultiChain.Log{
+              chain_id: chain,
+              block_number: log["blockNumber"],
+              tx_hash: log["transactionHash"],
+              log_index: log["logIndex"],
+              contract_address: log["address"],
+              topic_schema: List.first(log["topics"] || []),
+              dedupe_key: "#{chain}-#{log["transactionHash"]}-#{log["logIndex"]}",
+              data: log["data"],
+              topics: log["topics"],
+              raw_log: log
+            }
+          end)
+          {:ok, %{logs: normalized_logs}}
+
+        {:ok, %{result: nil}} -> 
+          {:ok, %{logs: []}}
+          
+        {:error, error} -> 
+          {:error, "Failed to index logs: #{error}"}
       end
     end
   end

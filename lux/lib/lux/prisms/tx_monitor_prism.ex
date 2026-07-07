@@ -45,10 +45,34 @@ defmodule Lux.Prisms.TxMonitorPrism do
 
         {:ok, %{result: receipt = %{"status" => status_hex}}} ->
           status = if status_hex == "0x1", do: "success", else: "failed"
-          {:ok, %{status: status, receipt: receipt}}
+          normalized_tx = %Lux.Schemas.MultiChain.Transaction{
+            chain_id: chain,
+            block_number: receipt["blockNumber"],
+            tx_hash: tx_hash,
+            from: receipt["from"],
+            to: receipt["to"],
+            value: receipt["value"] || "0x0",
+            status: status,
+            gas_used: receipt["gasUsed"],
+            dedupe_key: "#{chain}-#{tx_hash}",
+            raw_tx: receipt
+          }
+          {:ok, %{status: status, receipt: normalized_tx}}
 
         {:ok, %{result: receipt}} ->
-           {:ok, %{status: "success", receipt: receipt}}
+          normalized_tx = %Lux.Schemas.MultiChain.Transaction{
+            chain_id: chain,
+            block_number: receipt["blockNumber"],
+            tx_hash: tx_hash,
+            from: receipt["from"],
+            to: receipt["to"],
+            value: receipt["value"] || "0x0",
+            status: "success",
+            gas_used: receipt["gasUsed"],
+            dedupe_key: "#{chain}-#{tx_hash}",
+            raw_tx: receipt
+          }
+          {:ok, %{status: "success", receipt: normalized_tx}}
 
         {:error, error} ->
           {:error, "Failed to monitor tx: #{error}"}

@@ -43,6 +43,10 @@ Lux.Prisms.MultiChainRpcPrism.handler(%{
 # => {:ok, %{result: "0x...", chain: "ethereum"}}
 ```
 
+## Foundation Note
+
+This implementation serves as a foundational layer for a robust multi-chain data aggregation system. Currently, it provides an explicit RPC extraction layer with built-in retry, backoff, and provider fallback, as well as cross-chain normalized schemas (`Lux.Schemas.MultiChain.Log` and `Lux.Schemas.MultiChain.Transaction`) and a basic durable DETS-based aggregate store (`Lux.Stores.MultiChainStore`). Future work will build upon this foundation to add backfill/stream cursor logic, advanced query interfaces, and complex cross-chain analytics.
+
 ## Notes
-* **Data Storage / Retrieval:** This module specifically provides the RPC query primitives. High-level indexing, batch storage, and time-series querying require integration with a database and are outside the scope of this core prism.
-* **Error Handling:** The prism captures JSON-RPC error codes and returns them safely via `{:error, reason}` tuples rather than crashing.
+* **Data Storage / Retrieval:** This module provides the core RPC query primitives, normalized schemas, and a basic durable store. High-level indexing, batch storage, and time-series querying require integration with a database and are outside the scope of this core prism.
+* **Error Handling:** The prism captures JSON-RPC error codes, HTTP status errors, and automatically handles rate limits and retries with backoff.
