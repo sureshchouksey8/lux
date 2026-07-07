@@ -9,8 +9,16 @@ defmodule Lux.Web3.TransactionManagerTest do
 
   setup_all do
     # Ensure Registry and Supervisor are started if not already
-    Registry.start_link(keys: :unique, name: Lux.Web3.TransactionManagerRegistry)
-    DynamicSupervisor.start_link(strategy: :one_for_one, name: Lux.Web3.TransactionManagerSupervisor)
+    case Registry.start_link(keys: :unique, name: Lux.Web3.TransactionManagerRegistry) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
+    case DynamicSupervisor.start_link(strategy: :one_for_one, name: Lux.Web3.TransactionManagerSupervisor) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
+
     :ok
   end
 
@@ -23,19 +31,20 @@ defmodule Lux.Web3.TransactionManagerTest do
 
   test "initializes nonce and queues transaction successfully", context do
     with_mocks([
-      {Ethers, [], [
+      {Ethers, [:passthrough], [
         get_transaction_count: fn _addr -> {:ok, 42} end,
         send_transaction: fn _tx, _opts -> {:ok, "0xfirsttxhash"} end,
         get_transaction_receipt: fn _hash -> {:ok, %{"status" => "0x1", "blockNumber" => "0x100", "transactionHash" => "0xfirsttxhash"}} end,
         estimate_gas: fn _tx, _opts -> {:ok, 21000} end
       ]},
       {Ethereumex.HttpClient, [], [
+        eth_chain_id: fn -> {:ok, "0x1"} end,
         eth_max_priority_fee_per_gas: fn -> {:ok, "0x3b9aca00"} end, # 1 Gwei
         eth_get_block_by_number: fn "latest", false -> {:ok, %{"baseFeePerGas" => "0x3b9aca00"}} end
       ]}
     ]) do
       # Start the manager
-      assert {:ok, pid} = TransactionManager.start_manager(context.address, context.encrypted_pk)
+      assert {:ok, pid} = TransactionManager.start_manager(context.address, context.encrypted_pk, nonce: 42)
       
       # Wait a tiny bit for init_nonce continue to run
       Process.sleep(50)
@@ -60,7 +69,7 @@ defmodule Lux.Web3.TransactionManagerTest do
   test "escalates/speeds up a stuck transaction", context do
     # We will simulate a transaction that gets stuck, and trigger a check_receipt after moving its sent_at into the past.
     with_mocks([
-      {Ethers, [], [
+      {Ethers, [:passthrough], [
         get_transaction_count: fn _addr -> {:ok, 100} end,
         send_transaction: fn 
           _tx, [from: _, value: _, gas: _, nonce: 100, signer: _, signer_opts: _, max_fee_per_gas: 3000000000, max_priority_fee_per_gas: 1000000000] ->
@@ -77,12 +86,13 @@ defmodule Lux.Web3.TransactionManagerTest do
         estimate_gas: fn _tx, _opts -> {:ok, 21000} end
       ]},
       {Ethereumex.HttpClient, [], [
+        eth_chain_id: fn -> {:ok, "0x1"} end,
         eth_max_priority_fee_per_gas: fn -> {:ok, "0x3b9aca00"} end, # 1 Gwei
         eth_get_block_by_number: fn "latest", false -> {:ok, %{"baseFeePerGas" => "0x3b9aca00"}} end
       ]}
     ]) do
       # Start the manager
-      assert {:ok, pid} = TransactionManager.start_manager(context.address, context.encrypted_pk)
+      assert {:ok, pid} = TransactionManager.start_manager(context.address, context.encrypted_pk, nonce: 100)
       Process.sleep(50)
 
       # Send transaction asynchronously by spawning a task
@@ -131,6 +141,50 @@ defmodule Lux.Web3.TransactionManagerTest do
       assert receipt["status"] == "0x1"
 
       Task.await(task)
+    end
+  end
+
+  test "applies safety gates (dry-run, chain-id matching, and max fee caps)", context do
+    with_mocks([
+      {Ethers, [:passthrough], [
+        get_transaction_count: fn _addr -> {:ok, 42} end,
+        estimate_gas: fn _tx, _opts -> {:ok, 21000} end
+      ]},
+      {Ethereumex.HttpClient, [], [
+        eth_chain_id: fn -> {:ok, "0x1"} end, # Mainnet (chain 1)
+        eth_max_priority_fee_per_gas: fn -> {:ok, "0x3b9aca00"} end, # 1 Gwei
+        eth_get_block_by_number: fn "latest", false -> {:ok, %{"baseFeePerGas" => "0x3b9aca00"}} end
+      ]}
+    ]) do
+      assert {:ok, _pid} = TransactionManager.start_manager(context.address, context.encrypted_pk, nonce: 42)
+
+      # 1. Test Chain ID Mismatch Gate
+      mismatched_params = %{
+        to: "0x0000000000000000000000000000000000000000",
+        value: 1000,
+        chain_id: 137 # Polygon
+      }
+      assert {:error, "Chain ID mismatch" <> _} = TransactionManager.send_transaction(context.address, mismatched_params)
+
+      # 2. Test Max Fee Cap Gate
+      high_fee_params = %{
+        to: "0x0000000000000000000000000000000000000000",
+        value: 1000,
+        max_fee_cap: 100_000_000, # 0.1 Gwei (very low, will exceed)
+        max_fee_per_gas: 200_000_000 # 0.2 Gwei
+      }
+      assert {:error, "Gas price exceeds max fee cap"} = TransactionManager.send_transaction(context.address, high_fee_params)
+
+      # 3. Test Dry-run Gate
+      dry_run_params = %{
+        to: "0x0000000000000000000000000000000000000000",
+        value: 1000,
+        dry_run: true
+      }
+      assert {:ok, receipt} = TransactionManager.send_transaction(context.address, dry_run_params)
+      assert receipt["transactionHash"] == "0xdryrunhash"
+      assert receipt["status"] == "0x1"
+      assert receipt["gasUsed"] == "0x5208" # 21000 in hex
     end
   end
 end

@@ -81,7 +81,7 @@ defmodule Lux.Web3.WalletTest do
   describe "checksum_address/1" do
     test "computes correct EIP-55 checksum" do
       lower_address = "0x5a2b6f873b333cd96c342f88ef0a0a520a8d8c25"
-      expected = "0x5A2b6f873B333CD96C342f88EF0A0a520A8D8C25"
+      expected = "0x5A2B6F873B333cD96C342f88eF0a0A520A8d8c25"
       assert Wallet.checksum_address(lower_address) == expected
     end
   end

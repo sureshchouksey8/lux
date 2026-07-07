@@ -38,8 +38,10 @@ defmodule Lux.Web3.KeyManager do
         key = get_key()
 
         try do
-          decrypted = :crypto.crypto_one_time_aead(:aes_256_gcm, key, iv, ciphertext, @aad, tag, false)
-          {:ok, decrypted}
+          case :crypto.crypto_one_time_aead(:aes_256_gcm, key, iv, ciphertext, @aad, tag, false) do
+            :error -> {:error, "Decryption failed (invalid tag, key, or corrupted data)"}
+            decrypted -> {:ok, decrypted}
+          end
         rescue
           _ -> {:error, "Decryption failed (invalid tag, key, or corrupted data)"}
         end
@@ -50,7 +52,18 @@ defmodule Lux.Web3.KeyManager do
   end
 
   defp get_key do
-    master_key = System.get_env("MASTER_ENCRYPTION_KEY") || "dev_master_key_must_be_32_bytes_long_or_more"
-    :crypto.hash(:sha256, master_key)
+    master_key = System.get_env("MASTER_ENCRYPTION_KEY")
+    is_prod? = System.get_env("MIX_ENV") == "prod" or (Code.ensure_loaded?(Mix) and Mix.env() == :prod)
+
+    cond do
+      not is_nil(master_key) and master_key != "" ->
+        :crypto.hash(:sha256, master_key)
+
+      is_prod? ->
+        raise "Runtime error: MASTER_ENCRYPTION_KEY environment variable is required in production"
+
+      true ->
+        :crypto.hash(:sha256, "dev_master_key_must_be_32_bytes_long_or_more")
+    end
   end
 end

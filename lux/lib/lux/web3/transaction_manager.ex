@@ -16,8 +16,8 @@ defmodule Lux.Web3.TransactionManager do
   @doc """
   Starts a transaction manager GenServer for a specific address.
   """
-  def start_manager(address, encrypted_private_key) do
-    child_spec = {__MODULE__, [address: address, encrypted_private_key: encrypted_private_key]}
+  def start_manager(address, encrypted_private_key, opts \\ []) do
+    child_spec = {__MODULE__, Keyword.merge(opts, [address: address, encrypted_private_key: encrypted_private_key])}
     DynamicSupervisor.start_child(@supervisor, child_spec)
   end
 
@@ -55,15 +55,16 @@ defmodule Lux.Web3.TransactionManager do
   def init(opts) do
     address = Keyword.fetch!(opts, :address)
     encrypted_private_key = Keyword.fetch!(opts, :encrypted_private_key)
+    nonce = Keyword.get(opts, :nonce)
 
     state = %{
       address: address,
       encrypted_private_key: encrypted_private_key,
-      nonce: nil,
+      nonce: nonce,
       queue: :queue.new(),
       active_tx: nil,
       timer: nil,
-      nonce_initialized: false
+      nonce_initialized: not is_nil(nonce)
     }
 
     # Lazy nonce init: nonce is fetched on first transaction, not on startup.
@@ -126,15 +127,41 @@ defmodule Lux.Web3.TransactionManager do
 
   @impl true
   def handle_call({:send_transaction, tx_params}, from, state) do
-    tx = %{id: make_ref(), params: tx_params, reply_to: from}
-    new_queue = :queue.in(tx, state.queue)
-    new_state = %{state | queue: new_queue}
+    current_chain_id = get_current_chain_id()
 
-    # Trigger nonce initialization on first transaction if not yet done
-    if state.nonce_initialized do
-      {:noreply, new_state, {:continue, :process_queue}}
-    else
-      {:noreply, new_state, {:continue, :init_nonce}}
+    cond do
+      tx_params[:chain_id] && tx_params[:chain_id] != current_chain_id ->
+        {:reply, {:error, "Chain ID mismatch: expected #{tx_params[:chain_id]}, got #{current_chain_id}"}, state}
+
+      exceeds_fee_cap?(tx_params) ->
+        {:reply, {:error, "Gas price exceeds max fee cap"}, state}
+
+      tx_params[:dry_run] == true ->
+        case dry_run_tx(tx_params, state) do
+          {:ok, gas_estimate} ->
+            simulated_receipt = %{
+              "transactionHash" => "0xdryrunhash",
+              "blockNumber" => "0x0",
+              "status" => "0x1",
+              "gasUsed" => Ethers.Utils.integer_to_hex(gas_estimate)
+            }
+            {:reply, {:ok, simulated_receipt}, state}
+
+          {:error, reason} ->
+            {:reply, {:error, "Dry-run failed: #{inspect(reason)}"}, state}
+        end
+
+      true ->
+        tx = %{id: make_ref(), params: tx_params, reply_to: from}
+        new_queue = :queue.in(tx, state.queue)
+        new_state = %{state | queue: new_queue}
+
+        # Trigger nonce initialization on first transaction if not yet done
+        if state.nonce_initialized do
+          {:noreply, new_state, {:continue, :process_queue}}
+        else
+          {:noreply, new_state, {:continue, :init_nonce}}
+        end
     end
   end
 
@@ -222,7 +249,7 @@ defmodule Lux.Web3.TransactionManager do
       data_bin = tx.params[:data] || ""
       value = tx.params[:value] || 0
 
-      ethers_tx = %Ethers.TxData{to: to_addr, data: data_bin}
+      ethers_tx = %{to: to_addr, data: data_bin}
 
       send_opts = [
         from: state.address,
@@ -247,18 +274,18 @@ defmodule Lux.Web3.TransactionManager do
       new_gas_opts =
         case active_tx.gas_opts do
           [max_fee_per_gas: max_fee, max_priority_fee_per_gas: priority_fee] ->
-            [max_fee_per_gas: trunc(max_fee * 1.15), max_priority_fee_per_gas: trunc(priority_fee * 1.15)]
+            [max_fee_per_gas: round(max_fee * 1.15), max_priority_fee_per_gas: round(priority_fee * 1.15)]
 
           [gas_price: price] ->
-            [gas_price: trunc(price * 1.15)]
+            [gas_price: round(price * 1.15)]
 
           _ ->
             case estimate_fees() do
               {:ok, %{max_fee_per_gas: max_fee, max_priority_fee_per_gas: priority_fee}} ->
-                [max_fee_per_gas: trunc(max_fee * 1.15), max_priority_fee_per_gas: trunc(priority_fee * 1.15)]
+                [max_fee_per_gas: round(max_fee * 1.15), max_priority_fee_per_gas: round(priority_fee * 1.15)]
 
               {:ok, %{gas_price: price}} ->
-                [gas_price: trunc(price * 1.15)]
+                [gas_price: round(price * 1.15)]
 
               _ ->
                 []
@@ -269,7 +296,7 @@ defmodule Lux.Web3.TransactionManager do
       data_bin = active_tx.params[:data] || ""
       value = active_tx.params[:value] || 0
 
-      ethers_tx = %Ethers.TxData{to: to_addr, data: data_bin}
+      ethers_tx = %{to: to_addr, data: data_bin}
 
       send_opts = [
         from: state.address,
@@ -288,7 +315,7 @@ defmodule Lux.Web3.TransactionManager do
   end
 
   defp estimate_gas_limit(params, state) do
-    ethers_tx = %Ethers.TxData{to: params[:to], data: params[:data] || ""}
+    ethers_tx = %{to: params[:to], data: params[:data] || ""}
     opts = [from: state.address, value: params[:value] || 0]
 
     case Ethers.estimate_gas(ethers_tx, opts) do
@@ -331,4 +358,39 @@ defmodule Lux.Web3.TransactionManager do
   defp hex_to_int("0x" <> hex), do: String.to_integer(hex, 16)
   defp hex_to_int(hex) when is_binary(hex), do: String.to_integer(hex, 16)
   defp hex_to_int(int) when is_integer(int), do: int
+
+  defp get_current_chain_id do
+    case Ethereumex.HttpClient.eth_chain_id() do
+      {:ok, hex} -> hex_to_int(hex)
+      _ -> 1
+    end
+  end
+
+  defp exceeds_fee_cap?(tx_params) do
+    default_cap = 500_000_000_000 # 500 Gwei
+    cap = tx_params[:max_fee_cap] || default_cap
+
+    max_fee = tx_params[:max_fee_per_gas] || tx_params[:gas_price]
+
+    if max_fee && max_fee > cap do
+      true
+    else
+      case estimate_fees() do
+        {:ok, %{max_fee_per_gas: est_max}} -> est_max > cap
+        {:ok, %{gas_price: est_price}} -> est_price > cap
+        _ -> false
+      end
+    end
+  end
+
+  defp dry_run_tx(params, state) do
+    ethers_tx = %{to: params[:to], data: params[:data] || ""}
+    opts = [from: state.address, value: params[:value] || 0]
+
+    case Ethers.estimate_gas(ethers_tx, opts) do
+      {:ok, gas} -> {:ok, gas}
+      {:error, reason} -> {:error, reason}
+      _ -> {:error, "Unknown estimation error"}
+    end
+  end
 end
