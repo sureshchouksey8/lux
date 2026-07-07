@@ -13,12 +13,38 @@ defmodule Lux.Integrations.Twitter.OAuthTest do
   end
 
   test "get_token/2 makes request to twitter token endpoint" do
-    Req.Test.stub(TwitterOAuthTest, fn conn ->
+    Application.put_env(:lux, OAuth, plug: TwitterOAuthTestPlug)
+    on_exit(fn -> Application.delete_env(:lux, OAuth) end)
+
+    Req.Test.stub(TwitterOAuthTestPlug, fn conn ->
+      assert conn.method == "POST"
+      assert conn.request_path == "/2/oauth2/token"
+      
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      assert body =~ "grant_type=authorization_code"
+      assert body =~ "code=my_code"
+      
       Req.Test.json(conn, %{"access_token" => "abc", "refresh_token" => "def"})
     end)
-    # Using dynamic module replacement isn't supported for Req.post! by default via plug unless we use Req.new
-    # Since OAuth uses Req.post! we can mock Req with Mock or bypass. 
-    # Because Req.post! doesn't accept plug: in the options in the source implementation... Wait, we must modify oauth.ex if we want to pass plug options, or we can use `bypass` or mock.
-    # Actually, the original implementation in oauth.ex does not accept a plug option: Req.post!(@token_url, form: payload). Let's modify oauth.ex later or just use Mock.
+
+    assert {:ok, %{"access_token" => "abc", "refresh_token" => "def"}} = OAuth.get_token("my_code")
+  end
+
+  test "refresh_token/2 makes request to twitter refresh endpoint" do
+    Application.put_env(:lux, OAuth, plug: TwitterOAuthTestPlug)
+    on_exit(fn -> Application.delete_env(:lux, OAuth) end)
+
+    Req.Test.stub(TwitterOAuthTestPlug, fn conn ->
+      assert conn.method == "POST"
+      assert conn.request_path == "/2/oauth2/token"
+      
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      assert body =~ "grant_type=refresh_token"
+      assert body =~ "refresh_token=my_refresh_token"
+      
+      Req.Test.json(conn, %{"access_token" => "new_abc", "refresh_token" => "new_def"})
+    end)
+
+    assert {:ok, %{"access_token" => "new_abc", "refresh_token" => "new_def"}} = OAuth.refresh_token("my_refresh_token")
   end
 end

@@ -48,7 +48,11 @@ defmodule Lux.Integrations.Twitter.OAuth do
       "code_verifier" => code_verifier
     }
 
-    Req.post!(@token_url, form: payload)
+    req_opts = [form: payload]
+               |> Keyword.merge(Application.get_env(:lux, __MODULE__, []))
+               |> maybe_add_plug(opts[:plug])
+
+    Req.post!(@token_url, req_opts)
     |> case do
       %{status: 200, body: body} -> {:ok, body}
       %{body: body} -> {:error, body}
@@ -68,10 +72,17 @@ defmodule Lux.Integrations.Twitter.OAuth do
       "client_id" => client_id
     }
 
-    Req.post!(@token_url, form: payload)
+    req_opts = [form: payload]
+               |> Keyword.merge(Application.get_env(:lux, __MODULE__, []))
+               |> maybe_add_plug(opts[:plug])
+
+    Req.post!(@token_url, req_opts)
     |> case do
       %{status: 200, body: body} -> {:ok, body}
       %{body: body} -> {:error, body}
     end
   end
+
+  defp maybe_add_plug(options, nil), do: options
+  defp maybe_add_plug(options, plug), do: Keyword.put(options, :plug, plug)
 end

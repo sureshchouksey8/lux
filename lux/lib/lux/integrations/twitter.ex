@@ -23,12 +23,4 @@ defmodule Lux.Integrations.Twitter do
     ]
   end
 
-  @doc """
-  Builds OAuth 1.0a headers for Twitter API (required for some media endpoints if not using OAuth 2.0).
-  In a real scenario, this would generate the OAuth signature.
-  """
-  def oauth1_headers(_method, _url, _params) do
-    # Placeholder for OAuth 1.0a signature generation
-    []
-  end
 end
