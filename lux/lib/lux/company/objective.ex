@@ -26,7 +26,8 @@ defmodule Lux.Company.Objective do
           metadata: map(),
           input_schema: map() | nil,
           tasks: list(),
-          error: term() | nil
+          error: term() | nil,
+          context: map()
         }
 
   @type status :: :pending | :in_progress | :completed | :failed
@@ -45,7 +46,8 @@ defmodule Lux.Company.Objective do
     completed_at: nil,
     metadata: %{},
     tasks: [],
-    error: nil
+    error: nil,
+    context: %{}
   ]
 
   @doc """
@@ -60,7 +62,8 @@ defmodule Lux.Company.Objective do
         success_criteria: Map.get(attrs, :success_criteria, ""),
         steps: Map.get(attrs, :steps, []),
         input_schema: Map.get(attrs, :input_schema),
-        metadata: Map.get(attrs, :metadata, %{})
+        metadata: Map.get(attrs, :metadata, %{}),
+        context: Map.get(attrs, :context, %{})
       })
 
     {:ok, objective}

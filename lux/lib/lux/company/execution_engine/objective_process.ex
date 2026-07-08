@@ -148,6 +148,7 @@ defmodule Lux.Company.ExecutionEngine.ObjectiveProcess do
       }
 
       Logger.debug("Initial state: #{inspect(state)}")
+      send(self(), :run_steps)
       {:ok, state}
     else
       _ ->
@@ -223,6 +224,14 @@ defmodule Lux.Company.ExecutionEngine.ObjectiveProcess do
     {:reply, :ok, new_state}
   end
 
+  def handle_call({:set_context, context}, _from, state) do
+    Logger.debug("Setting context for objective #{state.id}: #{inspect(context)}")
+    new_objective = %{state.objective | context: context}
+    new_state = %{state | objective: new_objective}
+    notify_company(new_state)
+    {:reply, :ok, new_state}
+  end
+
   def handle_call(:get_task_tracker, _from, state) do
     {:reply, {:ok, state.task_tracker}, state}
   end
@@ -238,6 +247,111 @@ defmodule Lux.Company.ExecutionEngine.ObjectiveProcess do
     )
 
     {:reply, {:error, :invalid_state_transition}, state}
+  end
+
+  @impl true
+  def handle_info(:run_steps, state) do
+    pid = self()
+    Task.start(fn ->
+      try do
+        :ok = initialize(pid)
+        :ok = start(pid)
+
+        company_pid = state.company_pid
+        hub = Lux.AgentHub.get_default()
+
+        objective = state.objective
+        steps = objective.steps
+        total_steps = length(steps)
+
+        initial_context = Map.new(state.input)
+
+        final_context_result =
+          steps
+          |> Enum.with_index()
+          |> Enum.reduce_while({:ok, initial_context}, fn {step, index}, {:ok, current_context} ->
+            step_name =
+              case step do
+                %{"name" => name} -> name
+                s when is_binary(s) -> s
+                _ -> to_string(step)
+              end
+
+            :ok = set_current_step(pid, step)
+            progress = round(index / total_steps * 100)
+            :ok = update_progress(pid, progress)
+
+            req_caps =
+              case step do
+                %{"required_capabilities" => caps} -> caps
+                _ -> []
+              end
+
+            agents = Lux.AgentHub.list_agents(hub)
+
+            matching_agent =
+              Enum.find(agents, fn agent_info ->
+                caps = agent_info.capabilities || []
+                Enum.all?(req_caps, fn cap ->
+                  cap_str = to_string(cap)
+                  Enum.any?(caps, &(to_string(&1) == cap_str))
+                end)
+              end)
+
+            case matching_agent do
+              nil ->
+                Logger.warning("No agent found with capabilities: #{inspect(req_caps)}")
+                {:halt, {:error, "No agent found with capabilities: #{inspect(req_caps)}"}}
+
+              agent_info ->
+                prompt = """
+                Step: #{step_name}
+                Current Context: #{Jason.encode!(current_context)}
+                """
+
+                case GenServer.call(agent_info.pid, {:chat, prompt, []}) do
+                  {:ok, response} ->
+                    parsed_response =
+                      case response do
+                        map when is_map(map) ->
+                          map
+
+                        str when is_binary(str) ->
+                          case Jason.decode(str) do
+                            {:ok, decoded} -> decoded
+                            _ -> %{"output" => str}
+                          end
+
+                        _ ->
+                          %{}
+                      end
+
+                    new_context = Map.merge(current_context, parsed_response)
+                    {:cont, {:ok, new_context}}
+
+                  {:error, reason} ->
+                    Logger.error("Agent failed to process step: #{inspect(reason)}")
+                    {:halt, {:error, reason}}
+                end
+            end
+          end)
+
+        case final_context_result do
+          {:ok, final_context} ->
+            :ok = GenServer.call(pid, {:set_context, final_context})
+            :ok = complete(pid)
+
+          {:error, reason} ->
+            :ok = fail(pid, reason)
+        end
+      catch
+        kind, error ->
+          Logger.error("Error executing steps: #{inspect({kind, error})} \n #{inspect(__STACKTRACE__)}")
+          :ok = fail(pid, error)
+      end
+    end)
+
+    {:noreply, state}
   end
 
   @impl true

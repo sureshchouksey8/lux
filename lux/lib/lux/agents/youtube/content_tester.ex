@@ -4,6 +4,7 @@ defmodule Lux.Agents.YouTube.ContentTester do
   """
 
   use Lux.Agent,
+    template: :company_agent,
     name: "YouTube Content Tester",
     description: "Sets up A/B tests for thumbnails/titles and analyzes metrics",
     goal: "Evaluate content variations to identify top-performing combinations",

@@ -4,6 +4,7 @@ defmodule Lux.Agents.YouTube.MetadataManager do
   """
 
   use Lux.Agent,
+    template: :company_agent,
     name: "YouTube Metadata Manager",
     description: "Optimizes SEO metadata for YouTube videos",
     goal: "Maximize search discovery and click-through rates via optimized metadata",

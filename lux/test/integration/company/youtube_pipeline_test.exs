@@ -3,7 +3,7 @@ defmodule Lux.Integration.Company.YouTubePipelineTest do
   Integration tests for the YouTube Content Creation Pipeline.
   Showcases an end-to-end workflow for generating video scripts, visuals, metadata, and testing plans.
   """
-  use IntegrationCase, async: true
+  use IntegrationCase, async: false
 
   alias Lux.Company.Hub.Local
   alias Lux.Companies.YouTubePipeline
@@ -11,7 +11,10 @@ defmodule Lux.Integration.Company.YouTubePipelineTest do
   @moduletag :integration
 
   describe "youtube content creation workflow" do
-    setup do
+    setup context do
+      Req.Test.set_req_test_to_shared(context)
+      Application.put_env(:lux, Lux.LLM.OpenAI, plug: {Req.Test, OpenAI})
+
       # Set up deterministic Req stubs for the LLM API calls made by agents
       Req.Test.stub(OpenAI, fn conn ->
         {:ok, body, conn} = Plug.Conn.read_body(conn)

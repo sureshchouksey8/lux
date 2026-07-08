@@ -128,6 +128,13 @@ defmodule Lux.Company do
   end
 
   @doc """
+  Gets the agent hub for the company.
+  """
+  def get_agent_hub(company) do
+    GenServer.call(company, :get_agent_hub)
+  end
+
+  @doc """
   Runs a company with the given configuration.
   This starts all necessary processes and initializes the company state.
 
@@ -216,6 +223,10 @@ defmodule Lux.Company do
   @impl true
   def handle_call(:list_roles, _from, state) do
     {:reply, {:ok, Map.values(state.roles)}, state}
+  end
+
+  def handle_call(:get_agent_hub, _from, state) do
+    {:reply, {:ok, state.agent_hub}, state}
   end
 
   def handle_call({:create_role, role}, _from, state) do
@@ -440,7 +451,8 @@ defmodule Lux.Company do
             progress: objective_proc_state.progress,
             error: objective_proc_state.error,
             started_at: objective_proc_state.started_at,
-            completed_at: objective_proc_state.completed_at
+            completed_at: objective_proc_state.completed_at,
+            context: objective_proc_state.objective.context
         }
 
         updated_objectives = Map.put(state.objectives, execution_id, updated_objective)
@@ -649,6 +661,8 @@ defmodule Lux.Company do
     agent_hub = state.agent_hub
 
     Enum.each(roles, fn role ->
+      Code.ensure_loaded(role.agent)
+
       if function_exported?(role.agent, :start_link, 1) do
         agent_name = :"#{role.agent}_#{Lux.UUID.generate()}"
         # Start the agent with a unique name to avoid concurrent test clashes

@@ -4,6 +4,7 @@ defmodule Lux.Agents.YouTube.ScriptGenerator do
   """
 
   use Lux.Agent,
+    template: :company_agent,
     name: "YouTube Script Generator",
     description: "Generates YouTube scripts, outlines, and hooks",
     goal: "Create high-retention, engaging video scripts tailored to specific audiences",

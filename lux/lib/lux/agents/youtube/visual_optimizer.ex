@@ -4,6 +4,7 @@ defmodule Lux.Agents.YouTube.VisualOptimizer do
   """
 
   use Lux.Agent,
+    template: :company_agent,
     name: "YouTube Visual Optimizer",
     description: "Suggests thumbnail designs, b-roll, and visual pacing for videos",
     goal: "Optimize visual elements for maximum click-through and retention",

@@ -60,7 +60,10 @@ defmodule Lux.Agent do
           memory_config: memory_config() | nil,
           memory_pid: pid() | nil,
           scheduled_actions: [scheduled_action()],
-          signal_handlers: [signal_handler()]
+          signal_handlers: [signal_handler()],
+          hub: atom() | pid() | nil,
+          router: atom() | pid() | nil,
+          capabilities: [atom()]
         }
 
   defstruct id: nil,
@@ -82,8 +85,10 @@ defmodule Lux.Agent do
               provider: :openai,
               model: "gpt-4",
               temperature: 0.7
-              # max_tokens: 1000
-            }
+            },
+            hub: nil,
+            router: nil,
+            capabilities: []
 
   @callback chat(t(), message :: String.t(), opts :: keyword()) ::
               {:ok, String.t()} | {:error, term()}
@@ -137,7 +142,8 @@ defmodule Lux.Agent do
         memory_pid: nil,
         scheduled_actions: Keyword.get(unquote(opts), :scheduled_actions, []),
         signal_handlers: Enum.uniq_by(@signal_handler_functions, fn {schema, _} -> schema end),
-        llm_config: Keyword.get(unquote(opts), :llm_config, %{})
+        llm_config: Keyword.get(unquote(opts), :llm_config, %{}),
+        capabilities: Keyword.get(unquote(opts), :capabilities, [])
       }
 
       @impl Agent
@@ -222,6 +228,8 @@ defmodule Lux.Agent do
       # GenServer Callbacks
       @impl GenServer
       def init(agent) do
+        require Logger
+        Logger.warning("AGENT INIT CALLED FOR #{inspect(agent.name)} with hub #{inspect(agent.hub)}")
         # Initialize memory if configured
         agent =
           case agent.memory_config do
@@ -238,6 +246,25 @@ defmodule Lux.Agent do
             _ ->
               agent
           end
+
+        # Register agent with the hub defensively
+        hub = agent.hub || Lux.AgentHub.get_default()
+        if hub do
+          try do
+            Lux.AgentHub.register(hub, agent, self(), agent.capabilities)
+          catch
+            _, _ ->
+              default_hub = Lux.AgentHub.get_default()
+              if default_hub && default_hub != hub do
+                try do
+                  Lux.AgentHub.register(default_hub, agent, self(), agent.capabilities)
+                catch
+                  _, _ -> :ok
+                end
+              end
+              :ok
+          end
+        end
 
         # Schedule initial runs for all scheduled actions
         for {module, interval_ms, input, opts} <- agent.scheduled_actions do
