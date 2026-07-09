@@ -152,9 +152,21 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
 
   defp normalize_keys(params) do
     Map.new(params, fn
-      {k, v} when is_binary(k) -> {String.to_atom(k), v}
+      {k, v} when is_binary(k) ->
+        case safe_to_existing_atom(k) do
+          nil -> {k, v}
+          atom -> {atom, v}
+        end
       {k, v} -> {k, v}
     end)
+  end
+
+  defp safe_to_existing_atom(key) do
+    try do
+      String.to_existing_atom(key)
+    rescue
+      ArgumentError -> nil
+    end
   end
 
   defp fetch_param(params, key) do

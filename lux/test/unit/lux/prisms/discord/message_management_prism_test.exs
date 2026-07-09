@@ -129,7 +129,7 @@ defmodule Lux.Prisms.Discord.MessageManagementPrismTest do
 
       assert {:error, {429, "Rate limit"}} =
                MessageManagementPrism.handler(
-                 %{action: "get", channel_id: @channel_id, limit: 5},
+                 %{action: "history", channel_id: @channel_id, limit: 5},
                  @agent_ctx
                )
     end
@@ -143,7 +143,7 @@ defmodule Lux.Prisms.Discord.MessageManagementPrismTest do
 
       assert {:error, {400, "Bad Request"}} =
                MessageManagementPrism.handler(
-                 %{action: "get", channel_id: @channel_id, limit: 5},
+                 %{action: "history", channel_id: @channel_id, limit: 5},
                  @agent_ctx
                )
     end
@@ -157,7 +157,7 @@ defmodule Lux.Prisms.Discord.MessageManagementPrismTest do
 
       assert {:error, {403, "Forbidden"}} =
                MessageManagementPrism.handler(
-                 %{action: "get", channel_id: @channel_id, limit: 5},
+                 %{action: "history", channel_id: @channel_id, limit: 5},
                  @agent_ctx
                )
     end
