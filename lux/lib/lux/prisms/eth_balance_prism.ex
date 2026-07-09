@@ -132,8 +132,23 @@ defmodule Lux.Prisms.EthBalancePrism do
     end
   end
 
-  # Convert string keys to atoms in maps
+  # Convert string keys to atoms in maps safely
   defp atomize_keys(map) when is_map(map) do
-    Map.new(map, fn {k, v} -> {String.to_atom(k), v} end)
+    Map.new(map, fn
+      {k, v} when is_binary(k) ->
+        case safe_to_existing_atom(k) do
+          nil -> {k, v}
+          atom -> {atom, v}
+        end
+      {k, v} -> {k, v}
+    end)
+  end
+
+  defp safe_to_existing_atom(key) do
+    try do
+      String.to_existing_atom(key)
+    rescue
+      ArgumentError -> nil
+    end
   end
 end
