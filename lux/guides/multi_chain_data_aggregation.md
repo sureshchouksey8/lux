@@ -44,5 +44,5 @@ Lux.Prisms.MultiChainRpcPrism.handler(%{
 ```
 
 ## Notes
-* **Data Storage / Retrieval:** This module specifically provides the RPC query primitives. High-level indexing, batch storage, and time-series querying require integration with a database and are outside the scope of this core prism.
+* **Foundation Note:** This module includes a durable aggregate store (`Lux.Stores.MultiChainStore`), normalized event/transaction schemas, and resilient querying primitives. It serves as a robust foundational aggregation engine that can be extended further for stream subscriber loops in the future.
 * **Error Handling:** The prism captures JSON-RPC error codes and returns them safely via `{:error, reason}` tuples rather than crashing.
