@@ -89,7 +89,7 @@ defmodule Lux.Web3.EventMonitor do
     case fetch_logs(contract, event, chain, from, to) do
       {:ok, logs} ->
         processed = process_logs(logs, contract, event, state.webhooks)
-        new_events = state.events ++ processed
+        new_events = Enum.uniq_by(state.events ++ processed, fn e -> {e.tx_hash, e.log_index} end)
         {:reply, {:ok, processed}, %{state | events: new_events}}
 
       {:error, reason} ->
@@ -146,7 +146,7 @@ defmodule Lux.Web3.EventMonitor do
   end
 
   def handle_info({:accumulate_events, new_events}, state) do
-    {:noreply, %{state | events: state.events ++ new_events}}
+    {:noreply, %{state | events: Enum.uniq_by(state.events ++ new_events, fn e -> {e.tx_hash, e.log_index} end)}}
   end
 
   # Helper Functions
@@ -196,7 +196,7 @@ defmodule Lux.Web3.EventMonitor do
     to_hex = "0x" <> Integer.to_string(to, 16)
 
     # Calculate topic from event signature
-    topic = "0x" <> (:crypto.hash(:sha256, event_sig) |> Base.encode16(case: :lower))
+    topic = "0x" <> (ExKeccak.hash_256(event_sig) |> Base.encode16(case: :lower))
 
     filter = %{
       address: contract,
