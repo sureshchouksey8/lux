@@ -1,6 +1,7 @@
 defmodule Lux.YouTube.Prisms.ContentRecommendationPrism do
   @moduledoc """
   Recommends content and analyzes trending topics on YouTube deterministically.
+  NOTE: This is a deterministic heuristic baseline model, not a true ML prediction model.
   """
   use Lux.Prism,
     name: "ContentRecommendationPrism",

@@ -1,6 +1,7 @@
 defmodule Lux.YouTube.Prisms.MetadataOptimizationPrism do
   @moduledoc """
   Generates and optimizes metadata such as titles, tags, and descriptions for YouTube videos.
+  NOTE: This is a deterministic heuristic baseline model, not a true ML prediction model.
   """
   use Lux.Prism,
     name: "MetadataOptimizationPrism",
@@ -15,6 +16,14 @@ defmodule Lux.YouTube.Prisms.MetadataOptimizationPrism do
         "target_audience" => %{
           type: "string",
           description: "The intended demographic or audience"
+        },
+        "audience_timezone" => %{
+          type: "string",
+          description: "Primary timezone of the audience"
+        },
+        "trend_evidence" => %{
+          type: "string",
+          description: "Evidence of trending days or posting patterns"
         }
       },
       required: ["topic"]
@@ -28,13 +37,17 @@ defmodule Lux.YouTube.Prisms.MetadataOptimizationPrism do
 
   def handler(%{"topic" => topic} = input, _context) do
     audience = Map.get(input, "target_audience", "general audience")
+    timezone = Map.get(input, "audience_timezone", "EST")
+    trends = Map.get(input, "trend_evidence", "Wednesday, Friday, Saturday")
 
-    # This represents a mock of a machine learning model optimizing metadata
-    titles = [
-      "#{String.capitalize(topic)}: The Ultimate Guide for #{audience}",
-      "I Tried #{topic} and This Happened...",
-      "What You Need to Know About #{topic} in 2026"
-    ]
+    # Deterministic baseline model (not a true ML model)
+    titles =
+      [
+        "#{String.capitalize(topic)}: The Ultimate Guide for #{audience}",
+        "I Tried #{topic} and This Happened...",
+        "What You Need to Know About #{topic} in 2026"
+      ]
+      |> Enum.map(&String.slice(&1, 0, 100)) # YouTube 100 char limit
 
     tags =
       topic
@@ -45,20 +58,30 @@ defmodule Lux.YouTube.Prisms.MetadataOptimizationPrism do
       |> Enum.uniq()
       |> Enum.take(15)
 
-    description = """
-    In this video, we dive deep into #{topic}.
-    Perfect for #{audience} looking to understand the latest trends and techniques.
+    tags_joined = Enum.join(tags, " #")
 
-    Don't forget to like, subscribe, and hit the bell icon!
+    description =
+      """
+      In this video, we dive deep into #{topic}.
+      Perfect for #{audience} looking to understand the latest trends and techniques.
 
-    # #{Enum.join(tags, " #")}
-    """
+      Don't forget to like, subscribe, and hit the bell icon!
 
-    posting_times = [
-      "Wednesday 3:00 PM EST",
-      "Friday 12:00 PM EST",
-      "Saturday 10:00 AM EST"
-    ]
+      # #{tags_joined}
+      """
+      |> String.slice(0, 5000) # YouTube 5000 char limit
+
+    trend_days =
+      trends
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      
+    posting_times =
+      case trend_days do
+        [] -> ["Default peak hours in #{timezone}"]
+        days -> Enum.map(days, &"#{&1} peak hours in #{timezone}")
+      end
 
     {:ok,
      %{
@@ -70,7 +93,8 @@ defmodule Lux.YouTube.Prisms.MetadataOptimizationPrism do
          "High contrast text overlay with expressive face",
          "Before and after split screen",
          "Minimalist design with bold #{topic} graphic"
-       ]
+       ],
+       model: "deterministic_baseline_v1"
      }}
   end
 end
