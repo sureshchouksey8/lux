@@ -102,15 +102,6 @@ defmodule Lux.Integrations.Twitter.ClientTest do
     assert {:ok, %{"data" => %{"following" => false}}} = Client.unfollow_user("111", "222", plug: TwitterClientTest)
   end
 
-  test "upload_media/3 handles media upload" do
-    File.write!("test_media.jpg", "fake_image_data")
-    Req.Test.stub(TwitterClientTest, fn conn ->
-      Req.Test.json(conn, %{"media_id" => 1234567, "media_id_string" => "1234567"})
-    end)
-    assert {:ok, %{"media_id" => 1234567}} = Client.upload_media("test_media.jpg", "image/jpeg", plug: TwitterClientTest)
-    File.rm!("test_media.jpg")
-  end
-
   test "handle rate limits" do
     Req.Test.stub(TwitterRateLimitTest, fn conn ->
       conn

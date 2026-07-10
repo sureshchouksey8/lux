@@ -80,32 +80,6 @@ defmodule Lux.Integrations.Twitter.Client do
   end
 
   @doc """
-  Uploads media to Twitter.
-  """
-  def upload_media(file_path, media_type, opts \\ %{}) do
-    file_content = File.read!(file_path)
-    multipart = [
-      {:file, file_content, {"form-data", [{"name", "media"}]}, []}
-    ]
-
-    token = opts[:token] || bearer_token()
-    url = "#{@media_url}/media/upload.json"
-
-    [
-      method: :post,
-      url: url,
-      headers: [
-        {"Authorization", "Bearer #{token}"}
-      ],
-      multipart: multipart
-    ]
-    |> maybe_add_plug(opts[:plug])
-    |> Req.new()
-    |> Req.request()
-    |> handle_response()
-  end
-
-  @doc """
   Fetches user profile.
   """
   def get_user_profile(username, opts \\ %{}) do
