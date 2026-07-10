@@ -108,7 +108,7 @@ defmodule Lux.Prisms.Discord.ModerationPrismTest do
         |> Plug.Conn.send_resp(429, Jason.encode!(%{"message" => "Rate limit", "retry_after" => 0.05}))
       end)
 
-      assert {:error, {429, "Rate limit"}} =
+      assert {:error, {429, "Rate limit", 0.05}} =
                ModerationPrism.handler(
                  %{action: "ban", guild_id: @guild_id, user_id: @user_id},
                  @agent_ctx

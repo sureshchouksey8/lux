@@ -107,7 +107,7 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrismTest do
         |> Plug.Conn.send_resp(429, Jason.encode!(%{"message" => "Rate limit", "retry_after" => 0.05}))
       end)
 
-      assert {:error, {429, "Rate limit"}} =
+      assert {:error, {429, "Rate limit", 0.05}} =
                ChannelManagementPrism.handler(
                  %{action: "get", channel_id: @channel_id},
                  @agent_ctx

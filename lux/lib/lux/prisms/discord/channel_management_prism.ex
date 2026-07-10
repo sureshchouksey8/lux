@@ -75,7 +75,7 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
   defp create_channel(params) do
     case fetch_param(params, :guild_id) do
       {:ok, guild_id} ->
-        payload = Map.take(normalize_keys(params), [:name, :type, :permission_overwrites])
+        payload = normalize_keys(params, [:name, :type, :permission_overwrites])
         with_retry(fn ->
           Client.request(:post, "/guilds/#{guild_id}/channels", %{json: payload})
         end)
@@ -89,7 +89,7 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
   defp update_channel(params) do
     case fetch_param(params, :channel_id) do
       {:ok, channel_id} ->
-        payload = Map.take(normalize_keys(params), [:name, :archived, :permission_overwrites])
+        payload = normalize_keys(params, [:name, :archived, :permission_overwrites])
         with_retry(fn ->
           Client.request(:patch, "/channels/#{channel_id}", %{json: payload})
         end)
@@ -134,14 +134,15 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
 
   defp with_retry(func, retries \\ 3) do
     case func.() do
-      {:error, {429, msg}} when retries > 0 ->
+      {:error, {429, _msg, retry_after}} when retries > 0 ->
         unless Application.get_env(:lux, :env) == :test do
-          delay =
-            case msg do
-              %{"retry_after" => r} when is_number(r) -> trunc(r * 1000)
-              _ -> 100
-            end
-          Process.sleep(delay)
+          Process.sleep(trunc(retry_after * 1000))
+        end
+        with_retry(func, retries - 1)
+
+      {:error, {429, _msg}} when retries > 0 ->
+        unless Application.get_env(:lux, :env) == :test do
+          Process.sleep(100)
         end
         with_retry(func, retries - 1)
 
@@ -150,23 +151,15 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
     end
   end
 
-  defp normalize_keys(params) do
-    Map.new(params, fn
-      {k, v} when is_binary(k) ->
-        case safe_to_existing_atom(k) do
-          nil -> {k, v}
-          atom -> {atom, v}
-        end
-      {k, v} -> {k, v}
+  defp normalize_keys(params, allowed_keys) do
+    Enum.reduce(allowed_keys, %{}, fn key, acc ->
+      string_key = Atom.to_string(key)
+      cond do
+        Map.has_key?(params, key) -> Map.put(acc, key, Map.fetch!(params, key))
+        Map.has_key?(params, string_key) -> Map.put(acc, key, Map.fetch!(params, string_key))
+        true -> acc
+      end
     end)
-  end
-
-  defp safe_to_existing_atom(key) do
-    try do
-      String.to_existing_atom(key)
-    rescue
-      ArgumentError -> nil
-    end
   end
 
   defp fetch_param(params, key) do

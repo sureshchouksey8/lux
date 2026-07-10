@@ -122,12 +122,13 @@ defmodule Lux.Prisms.Discord.MessageManagementPrismTest do
 
     test "handles 429 rate limit (using existing Client return shapes)" do
       Req.Test.stub(DiscordClientMock, fn conn ->
+        assert conn.request_path == "/api/v10/channels/#{@channel_id}/messages"
         conn
         |> Plug.Conn.put_resp_content_type("application/json")
         |> Plug.Conn.send_resp(429, Jason.encode!(%{"message" => "Rate limit", "retry_after" => 0.05}))
       end)
 
-      assert {:error, {429, "Rate limit"}} =
+      assert {:error, {429, "Rate limit", 0.05}} =
                MessageManagementPrism.handler(
                  %{action: "history", channel_id: @channel_id, limit: 5},
                  @agent_ctx
@@ -136,6 +137,7 @@ defmodule Lux.Prisms.Discord.MessageManagementPrismTest do
 
     test "handles 400 bad request" do
       Req.Test.stub(DiscordClientMock, fn conn ->
+        assert conn.request_path == "/api/v10/channels/#{@channel_id}/messages"
         conn
         |> Plug.Conn.put_resp_content_type("application/json")
         |> Plug.Conn.send_resp(400, Jason.encode!(%{"message" => "Bad Request"}))
@@ -150,6 +152,7 @@ defmodule Lux.Prisms.Discord.MessageManagementPrismTest do
 
     test "handles 403 forbidden" do
       Req.Test.stub(DiscordClientMock, fn conn ->
+        assert conn.request_path == "/api/v10/channels/#{@channel_id}/messages"
         conn
         |> Plug.Conn.put_resp_content_type("application/json")
         |> Plug.Conn.send_resp(403, Jason.encode!(%{"message" => "Forbidden"}))

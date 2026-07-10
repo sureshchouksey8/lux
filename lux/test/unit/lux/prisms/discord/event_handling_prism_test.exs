@@ -107,7 +107,7 @@ defmodule Lux.Prisms.Discord.EventHandlingPrismTest do
         |> Plug.Conn.send_resp(429, Jason.encode!(%{"message" => "Rate limit", "retry_after" => 0.05}))
       end)
 
-      assert {:error, {429, "Rate limit"}} =
+      assert {:error, {429, "Rate limit", 0.05}} =
                EventHandlingPrism.handler(
                  %{action: "list", guild_id: @guild_id},
                  @agent_ctx
