@@ -154,10 +154,11 @@ defmodule Lux.Lens do
           headers: headers,
           after_focus: after_focus
         },
-        _opts
+        opts
       ) do
     [url: url, headers: headers, max_retries: 2]
     |> Keyword.merge(Application.get_env(:lux, :req_options, []))
+    |> Keyword.merge(opts)
     |> Req.new()
     |> Req.request([method: method] ++ body_or_params(method, params))
     |> case do

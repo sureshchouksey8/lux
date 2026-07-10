@@ -59,7 +59,7 @@ defmodule Lux.Prisms.YouTube.ClassifyComment do
 
     # 2. Check for scam keywords
     scam_keywords = ["whatsapp", "telegram", "contact", "whatsapp me", "telegram me", "crypto profit", "easy money", "guaranteed return", "investment help", "invest", "giveaway", "whatsapp:", "telegram:", "dm me", "click here", "cash back", "make money"]
-    is_scam_link = has_url and Enum.any?(scam_keywords, &String.contains?(downcased, &1))
+    is_scam_link = Enum.any?(scam_keywords, &String.contains?(downcased, &1))
 
     # 3. Check for links-only spam
     # Just a URL with very few other words

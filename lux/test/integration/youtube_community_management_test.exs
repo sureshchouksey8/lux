@@ -123,10 +123,10 @@ defmodule Lux.Integration.YouTubeCommunityManagementTest do
       }))
     end)
 
-    assert {:ok, %{comments: comments}} = ListCommentThreads.focus(%{
-      video_id: "vid1",
-      plug: YouTubeClient
-    })
+    assert {:ok, %{comments: comments}} = ListCommentThreads.focus(
+      %{video_id: "vid1"},
+      plug: {Req.Test, YouTubeClient}
+    )
 
     assert length(comments) == 7
 
@@ -198,7 +198,7 @@ defmodule Lux.Integration.YouTubeCommunityManagementTest do
             parent_id: comment.id,
             text: decision.recommended_reply,
             dry_run: false,
-            plug: YouTubeClient
+            plug: {Req.Test, YouTubeClient}
           }, %{name: "CommunityManager"})
 
         {id, "hide"} when id in ["comment_scam", "comment_link_spam", "comment_abusive"] ->
@@ -208,7 +208,7 @@ defmodule Lux.Integration.YouTubeCommunityManagementTest do
             moderation_status: "rejected",
             ban_author: false,
             dry_run: false,
-            plug: YouTubeClient
+            plug: {Req.Test, YouTubeClient}
           }, %{name: "CommunityManager"})
 
         {"comment_escalate", "escalate"} ->
