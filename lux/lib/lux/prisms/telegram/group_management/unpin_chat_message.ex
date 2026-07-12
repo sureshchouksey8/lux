@@ -50,8 +50,9 @@ defmodule Lux.Prisms.Telegram.GroupManagement.UnpinChatMessage do
       agent_name = agent[:name] || "Unknown Agent"
       Logger.info("Agent #{agent_name} attempting to unpin chat message in chat #{chat_id}")
 
-      request_body = Map.take(params, [:chat_id, :message_id, :plug])
+      request_body = Map.take(params, [:chat_id, :message_id])
       request_opts = %{json: request_body}
+      request_opts = if params[:plug], do: Map.put(request_opts, :plug, params[:plug]), else: request_opts
 
       case Client.request(:post, "/unpinChatMessage", request_opts) do
         {:ok, %{"result" => true}} ->

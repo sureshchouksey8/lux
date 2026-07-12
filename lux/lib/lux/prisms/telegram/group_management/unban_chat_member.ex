@@ -56,8 +56,9 @@ defmodule Lux.Prisms.Telegram.GroupManagement.UnbanChatMember do
       agent_name = agent[:name] || "Unknown Agent"
       Logger.info("Agent #{agent_name} attempting to unban member in chat #{chat_id}")
 
-      request_body = Map.take(params, [:chat_id, :user_id, :only_if_banned, :plug])
+      request_body = Map.take(params, [:chat_id, :user_id, :only_if_banned])
       request_opts = %{json: request_body}
+      request_opts = if params[:plug], do: Map.put(request_opts, :plug, params[:plug]), else: request_opts
 
       case Client.request(:post, "/unbanChatMember", request_opts) do
         {:ok, %{"result" => true}} ->
