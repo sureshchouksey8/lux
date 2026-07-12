@@ -81,7 +81,7 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
         end)
         |> format_response()
 
-      :error ->
+      {:error, _} ->
         {:error, "guild_id is required for create action"}
     end
   end
@@ -95,7 +95,7 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
         end)
         |> format_response()
 
-      :error ->
+      {:error, _} ->
         {:error, "channel_id is required for update action"}
     end
   end
@@ -108,7 +108,7 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
         end)
         |> format_response()
 
-      :error ->
+      {:error, _} ->
         {:error, "channel_id is required for delete action"}
     end
   end
@@ -121,7 +121,7 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
         end)
         |> format_response()
 
-      :error ->
+      {:error, _} ->
         {:error, "channel_id is required for get action"}
     end
   end
@@ -169,13 +169,6 @@ defmodule Lux.Prisms.Discord.ChannelManagementPrism do
       Map.has_key?(params, key) -> {:ok, Map.fetch!(params, key)}
       Map.has_key?(params, string_key) -> {:ok, Map.fetch!(params, string_key)}
       true -> {:error, "#{string_key} is required"}
-    end
-  end
-
-  defp get_param(params, key, default \\ nil) do
-    case fetch_param(params, key) do
-      {:ok, value} -> value
-      {:error, _} -> default
     end
   end
 end

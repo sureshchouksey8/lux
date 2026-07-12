@@ -78,7 +78,7 @@ defmodule Lux.Prisms.Discord.MessageManagementPrism do
         end)
         |> format_response()
 
-      :error ->
+      {:error, _} ->
         {:error, "content is required for create action"}
     end
   end
@@ -105,7 +105,7 @@ defmodule Lux.Prisms.Discord.MessageManagementPrism do
         end)
         |> format_response(%{})
 
-      :error ->
+      {:error, _} ->
         {:error, "message_id is required for delete action"}
     end
   end
@@ -164,17 +164,6 @@ defmodule Lux.Prisms.Discord.MessageManagementPrism do
     end
   end
 
-  defp normalize_keys(params, allowed_keys) do
-    Enum.reduce(allowed_keys, %{}, fn key, acc ->
-      string_key = Atom.to_string(key)
-      cond do
-        Map.has_key?(params, key) -> Map.put(acc, key, Map.fetch!(params, key))
-        Map.has_key?(params, string_key) -> Map.put(acc, key, Map.fetch!(params, string_key))
-        true -> acc
-      end
-    end)
-  end
-
   defp fetch_param(params, key) do
     string_key = Atom.to_string(key)
 
@@ -185,7 +174,7 @@ defmodule Lux.Prisms.Discord.MessageManagementPrism do
     end
   end
 
-  defp get_param(params, key, default \\ nil) do
+  defp get_param(params, key, default) do
     case fetch_param(params, key) do
       {:ok, value} -> value
       {:error, _} -> default

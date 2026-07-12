@@ -113,7 +113,7 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
         end)
         |> format_response()
 
-      :error ->
+      {:error, _} ->
         {:error, "event_id is required for update action"}
     end
   end
@@ -126,7 +126,7 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
         end)
         |> format_response(%{})
 
-      :error ->
+      {:error, _} ->
         {:error, "event_id is required for delete action"}
     end
   end
@@ -143,12 +143,12 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
     body = if is_list(body), do: %{events: body}, else: body
     {:ok, %{status: "success", data: body}}
   end
+  defp format_response({:error, reason}), do: {:error, reason}
 
   defp format_response({:ok, _body}, default) do
     {:ok, %{status: "success", data: default}}
   end
-
-  defp format_response({:error, reason}), do: {:error, reason}
+  defp format_response({:error, reason}, _default), do: {:error, reason}
 
   defp with_retry(func, retries \\ 3) do
     case func.() do
@@ -187,13 +187,6 @@ defmodule Lux.Prisms.Discord.EventHandlingPrism do
       Map.has_key?(params, key) -> {:ok, Map.fetch!(params, key)}
       Map.has_key?(params, string_key) -> {:ok, Map.fetch!(params, string_key)}
       true -> {:error, "#{string_key} is required"}
-    end
-  end
-
-  defp get_param(params, key, default \\ nil) do
-    case fetch_param(params, key) do
-      {:ok, value} -> value
-      {:error, _} -> default
     end
   end
 end

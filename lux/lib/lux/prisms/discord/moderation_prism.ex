@@ -104,16 +104,10 @@ defmodule Lux.Prisms.Discord.ModerationPrism do
     |> format_response(%{})
   end
 
-  defp format_response({:ok, body}) do
-    body = if body == "", do: %{}, else: body
-    {:ok, %{status: "success", data: body}}
-  end
-
   defp format_response({:ok, _body}, default) do
     {:ok, %{status: "success", data: default}}
   end
-
-  defp format_response({:error, reason}), do: {:error, reason}
+  defp format_response({:error, reason}, _default), do: {:error, reason}
 
   defp with_retry(func, retries \\ 3) do
     case func.() do
@@ -137,17 +131,6 @@ defmodule Lux.Prisms.Discord.ModerationPrism do
   defp maybe_add_audit_reason(opts, nil), do: opts
   defp maybe_add_audit_reason(opts, reason) do
     Map.put(opts, :headers, [{"X-Audit-Log-Reason", URI.encode(reason)}])
-  end
-
-  defp normalize_keys(params, allowed_keys) do
-    Enum.reduce(allowed_keys, %{}, fn key, acc ->
-      string_key = Atom.to_string(key)
-      cond do
-        Map.has_key?(params, key) -> Map.put(acc, key, Map.fetch!(params, key))
-        Map.has_key?(params, string_key) -> Map.put(acc, key, Map.fetch!(params, string_key))
-        true -> acc
-      end
-    end)
   end
 
   defp fetch_param(params, key) do
