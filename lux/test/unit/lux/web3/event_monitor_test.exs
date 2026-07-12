@@ -42,7 +42,7 @@ defmodule Lux.Web3.EventMonitorTest do
       {:ok, body, _} = Plug.Conn.read_body(conn)
       json = Jason.decode!(body)
       assert json["method"] == "eth_getLogs"
-      
+
       logs = [
         %{
           "blockNumber" => "0x65",
@@ -80,7 +80,7 @@ defmodule Lux.Web3.EventMonitorTest do
     }
 
     send(EventMonitor, {:accumulate_events, [event_data]})
-    
+
     events = EventMonitor.get_persisted_events("0x123")
     assert length(events) == 1
     assert hd(events).contract == "0x123"

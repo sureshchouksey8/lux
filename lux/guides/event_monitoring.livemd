@@ -40,7 +40,7 @@ if Enum.empty?(events) do
   IO.puts("No events received yet. Waiting for blocks...")
 else
   events
-  |> Enum.map(fn e -> 
+  |> Enum.map(fn e ->
     %{
       block_number: e.block_number,
       tx_hash: e.tx_hash,
