@@ -93,7 +93,7 @@ defmodule Lux.Prisms.Telegram.GroupManagement.PromoteChatMember do
       Logger.info("Agent #{agent_name} attempting to promote member in chat #{chat_id}")
 
       request_body = Map.take(params, [
-        :chat_id, :user_id, :is_anonymous, :can_manage_chat, 
+        :chat_id, :user_id, :is_anonymous, :can_manage_chat,
         :can_delete_messages, :can_manage_video_chats, :can_restrict_members,
         :can_promote_members, :can_change_info, :can_invite_users,
         :can_pin_messages, :can_manage_topics
