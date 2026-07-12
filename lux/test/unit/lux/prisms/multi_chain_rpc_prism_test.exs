@@ -56,7 +56,7 @@ defmodule Lux.Prisms.MultiChainRpcPrismTest do
       Req.Test.expect(MultiChainRpcPrism, 2, fn conn ->
         count = Process.get(:req_count)
         Process.put(:req_count, count + 1)
-        
+
         if count == 0 do
           Plug.Conn.send_resp(conn, 500, "Internal Server Error")
         else
@@ -67,7 +67,7 @@ defmodule Lux.Prisms.MultiChainRpcPrismTest do
       input = %{chain: "ethereum", method: "eth_blockNumber", params: []}
       assert {:ok, %{result: "0x1b5", chain: "ethereum"}} = MultiChainRpcPrism.handler(input, nil)
     end
-    
+
     test "handles malformed response" do
       Req.Test.expect(MultiChainRpcPrism, 2, fn conn ->
         Plug.Conn.send_resp(conn, 200, "not json")

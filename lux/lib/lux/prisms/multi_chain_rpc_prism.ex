@@ -54,13 +54,13 @@ defmodule Lux.Prisms.MultiChainRpcPrism do
         params: params,
         id: System.unique_integer([:positive])
       }
-      
+
       execute_with_fallback(rpc_urls, payload, chain, 0)
     end
   end
 
   defp execute_with_fallback([], _payload, _chain, _attempt), do: {:error, :all_providers_failed}
-  
+
   defp execute_with_fallback([url | rest], payload, chain, attempt) do
     req_options = Application.get_env(:lux, :req_options, [])
     req = Req.new(req_options) |> Req.Request.put_header("content-type", "application/json")
@@ -85,7 +85,7 @@ defmodule Lux.Prisms.MultiChainRpcPrism do
 
       {:error, _exception} ->
         execute_with_fallback(rest, payload, chain, 0)
-        
+
       _ ->
         {:error, :malformed_response}
     end
