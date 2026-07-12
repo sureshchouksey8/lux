@@ -76,7 +76,7 @@ defmodule Lux.YouTube.Prisms.MetadataOptimizationPrism do
       |> String.split(",")
       |> Enum.map(&String.trim/1)
       |> Enum.reject(&(&1 == ""))
-      
+
     posting_times =
       case trend_days do
         [] -> ["Default peak hours in #{timezone}"]

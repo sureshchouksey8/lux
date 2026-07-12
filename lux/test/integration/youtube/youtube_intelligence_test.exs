@@ -48,7 +48,7 @@ defmodule Lux.Integration.YouTube.YouTubeIntelligenceTest do
       # Simulate the workflow deterministically by calling the prisms directly.
       # This proves that raw analytics input is normalized into bounded recommendations and metadata
       # without depending on live OpenAI credentials.
-      
+
       # 1. Performance Analytics Prism
       {:ok, %{analysis_results: analysis}} = Lux.YouTube.Prisms.PerformanceAnalyticsPrism.run(%{
         "video_data" => [
@@ -77,7 +77,7 @@ defmodule Lux.Integration.YouTube.YouTubeIntelligenceTest do
           "average_retention" => 65.0
         }
       })
-      
+
       assert length(recs) == 2
       assert hd(recs).topic == "Elixir AI Agents"
 
