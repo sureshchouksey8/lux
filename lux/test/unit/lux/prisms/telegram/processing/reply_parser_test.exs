@@ -20,23 +20,26 @@ defmodule Lux.Prisms.Telegram.Processing.ReplyParserTest do
       assert result.replied_message_id == 123
       assert result.replied_user_id == 456
       assert result.replied_text == "original message"
+      assert result.route_to == "reply_handler"
+      assert result.reply_state == "in_context"
+      assert result.planned_reply_action == %{type: "sendMessage", reply_to_message_id: 123}
     end
     
-    test "parses a reply message with caption" do
+    test "parses a reply to a media message" do
       params = %{
         message: %{
           "reply_to_message" => %{
-            "message_id" => 124,
+            "message_id" => 123,
             "from" => %{"id" => 456},
-            "caption" => "a photo"
+            "caption" => "original caption"
           }
         }
       }
       
       assert {:ok, result} = ReplyParser.handler(params, %{})
       assert result.is_reply == true
-      assert result.replied_message_id == 124
-      assert result.replied_text == "a photo"
+      assert result.replied_text == "original caption"
+      assert result.route_to == "reply_handler"
     end
     
     test "parses a non-reply message" do
@@ -51,6 +54,9 @@ defmodule Lux.Prisms.Telegram.Processing.ReplyParserTest do
       assert result.replied_message_id == nil
       assert result.replied_user_id == nil
       assert result.replied_text == nil
+      assert result.route_to == "default_handler"
+      assert result.reply_state == "none"
+      assert result.planned_reply_action == nil
     end
     
     test "handles missing message" do

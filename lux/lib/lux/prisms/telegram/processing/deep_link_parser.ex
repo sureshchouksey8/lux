@@ -3,7 +3,8 @@ defmodule Lux.Prisms.Telegram.Processing.DeepLinkParser do
   A prism for parsing Telegram deep linking payloads.
   
   When a user clicks a deep link (e.g., t.me/bot?start=payload), the bot receives
-  a message like "/start payload". This prism extracts and decodes the payload.
+  a message like "/start payload". This prism extracts and decodes the payload,
+  including support for group variants like /startgroup and targeted commands like /start@bot.
   """
 
   use Lux.Prism,
@@ -26,12 +27,13 @@ defmodule Lux.Prisms.Telegram.Processing.DeepLinkParser do
     }
 
   def handler(%{text: text}, _agent) when is_binary(text) do
-    if String.starts_with?(text, "/start ") do
-      # Extract everything after "/start "
-      payload = String.slice(text, 7..-1//1)
-      {:ok, %{is_deep_link: true, payload: String.trim(payload)}}
-    else
-      {:ok, %{is_deep_link: false, payload: nil}}
+    regex = ~r/^\/(?:start|startgroup)(?:@[a-zA-Z0-9_]+)?\s+(.+)$/
+    
+    case Regex.run(regex, text) do
+      [_, payload] ->
+        {:ok, %{is_deep_link: true, payload: String.trim(payload)}}
+      _ ->
+        {:ok, %{is_deep_link: false, payload: nil}}
     end
   end
   

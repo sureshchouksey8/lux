@@ -1,6 +1,6 @@
 defmodule Lux.Prisms.Telegram.Processing.ReplyParser do
   @moduledoc """
-  A prism for parsing Telegram message replies.
+  A prism for parsing Telegram message replies, managing reply state and routing.
   """
 
   use Lux.Prism,
@@ -22,7 +22,16 @@ defmodule Lux.Prisms.Telegram.Processing.ReplyParser do
         is_reply: %{type: :boolean},
         replied_message_id: %{type: :integer},
         replied_user_id: %{type: :integer},
-        replied_text: %{type: :string}
+        replied_text: %{type: :string},
+        route_to: %{type: :string},
+        reply_state: %{type: :string},
+        planned_reply_action: %{
+          type: :object,
+          properties: %{
+            type: %{type: :string},
+            reply_to_message_id: %{type: :integer}
+          }
+        }
       },
       required: ["is_reply"]
     }
@@ -37,14 +46,23 @@ defmodule Lux.Prisms.Telegram.Processing.ReplyParser do
         is_reply: true,
         replied_message_id: reply_to["message_id"],
         replied_user_id: get_in(reply_to, ["from", "id"]),
-        replied_text: reply_to["text"] || reply_to["caption"]
+        replied_text: reply_to["text"] || reply_to["caption"],
+        route_to: "reply_handler",
+        reply_state: "in_context",
+        planned_reply_action: %{
+          type: "sendMessage",
+          reply_to_message_id: reply_to["message_id"]
+        }
       }}
     else
       {:ok, %{
         is_reply: false,
         replied_message_id: nil,
         replied_user_id: nil,
-        replied_text: nil
+        replied_text: nil,
+        route_to: "default_handler",
+        reply_state: "none",
+        planned_reply_action: nil
       }}
     end
   end

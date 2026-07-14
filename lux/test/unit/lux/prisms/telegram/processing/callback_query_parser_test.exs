@@ -18,6 +18,9 @@ defmodule Lux.Prisms.Telegram.Processing.CallbackQueryParserTest do
       assert result.from_id == 456
       assert result.action == "like"
       assert result.params == %{}
+      assert result.is_valid_payload == true
+      assert result.route_to == "callback_handler"
+      assert result.planned_actions == [%{type: "answerCallbackQuery", callback_query_id: "123"}]
     end
     
     test "parses a callback query with params" do
@@ -46,6 +49,19 @@ defmodule Lux.Prisms.Telegram.Processing.CallbackQueryParserTest do
       assert {:ok, result} = CallbackQueryParser.handler(params, %{})
       assert result.action == "settings"
       assert result.params == %{"notifications" => true, "dark_mode" => "on"}
+    end
+
+    test "rejects callback data exceeding 64 bytes limit" do
+      long_data = String.duplicate("a", 65)
+      params = %{
+        callback_query: %{
+          "id" => "123",
+          "from" => %{"id" => 456},
+          "data" => long_data
+        }
+      }
+      
+      assert {:error, "Callback data exceeds 64-byte limit"} = CallbackQueryParser.handler(params, %{})
     end
     
     test "handles missing callback_query" do

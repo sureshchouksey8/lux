@@ -11,6 +11,27 @@ defmodule Lux.Prisms.Telegram.Processing.DeepLinkParserTest do
       assert result.payload == "mypayload123"
     end
     
+    test "parses targeted deep link" do
+      params = %{text: "/start@bot_username mypayload123"}
+      assert {:ok, result} = DeepLinkParser.handler(params, %{})
+      assert result.is_deep_link == true
+      assert result.payload == "mypayload123"
+    end
+
+    test "parses group deep link" do
+      params = %{text: "/startgroup mypayload123"}
+      assert {:ok, result} = DeepLinkParser.handler(params, %{})
+      assert result.is_deep_link == true
+      assert result.payload == "mypayload123"
+    end
+
+    test "parses targeted group deep link" do
+      params = %{text: "/startgroup@bot_username mypayload123"}
+      assert {:ok, result} = DeepLinkParser.handler(params, %{})
+      assert result.is_deep_link == true
+      assert result.payload == "mypayload123"
+    end
+
     test "ignores regular start command" do
       params = %{text: "/start"}
       assert {:ok, result} = DeepLinkParser.handler(params, %{})
